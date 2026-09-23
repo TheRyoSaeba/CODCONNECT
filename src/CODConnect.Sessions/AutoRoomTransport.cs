@@ -8,6 +8,7 @@ public sealed class AutoRoomTransport : IRoomTransport, IConsoleInternetProvider
     private readonly string _mode;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private IRoomTransport? _resolved;
+    private bool _fellBack;
 
     private readonly bool _sweepOrphans;
 
@@ -29,8 +30,11 @@ public sealed class AutoRoomTransport : IRoomTransport, IConsoleInternetProvider
     public string ConnectionKind => _resolved?.ConnectionKind ?? "Direct";
 
     public async Task<IRoomTransport> ResolveAsync(CancellationToken cancellationToken = default)
+        => await ResolveAsync(retryFallback: false, cancellationToken).ConfigureAwait(false);
+
+    private async Task<IRoomTransport> ResolveAsync(bool retryFallback, CancellationToken cancellationToken)
     {
-        if (_resolved is not null)
+        if (_resolved is not null && !(retryFallback && _fellBack))
         {
             return _resolved;
         }
@@ -38,7 +42,13 @@ public sealed class AutoRoomTransport : IRoomTransport, IConsoleInternetProvider
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            return _resolved ??= await SelectAsync(cancellationToken).ConfigureAwait(false);
+            if (_resolved is null || (retryFallback && _fellBack))
+            {
+                _fellBack = false;
+                _resolved = await SelectAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            return _resolved;
         }
         finally
         {
@@ -47,10 +57,10 @@ public sealed class AutoRoomTransport : IRoomTransport, IConsoleInternetProvider
     }
 
     public async Task<(IConsoleNetworkInterface Port, EndpointInfo Advertise)> HostAsync(CancellationToken cancellationToken = default)
-        => await (await ResolveAsync(cancellationToken).ConfigureAwait(false)).HostAsync(cancellationToken).ConfigureAwait(false);
+        => await (await ResolveAsync(retryFallback: true, cancellationToken).ConfigureAwait(false)).HostAsync(cancellationToken).ConfigureAwait(false);
 
     public async Task<IConsoleNetworkInterface> JoinAsync(IReadOnlyList<EndpointInfo> peers, CancellationToken cancellationToken = default)
-        => await (await ResolveAsync(cancellationToken).ConfigureAwait(false)).JoinAsync(peers, cancellationToken).ConfigureAwait(false);
+        => await (await ResolveAsync(retryFallback: true, cancellationToken).ConfigureAwait(false)).JoinAsync(peers, cancellationToken).ConfigureAwait(false);
 
     public async Task<IConsoleNetworkInterface> StartConsoleInternetAsync(IPv4Address gateway, IPv4Address mask, CancellationToken cancellationToken = default)
         => await ResolveAsync(cancellationToken).ConfigureAwait(false) is IConsoleInternetProvider provider
@@ -108,6 +118,7 @@ public sealed class AutoRoomTransport : IRoomTransport, IConsoleInternetProvider
             }
 
             _log?.Invoke(reason + "; falling back to direct TCP (same LAN or port-forward only)");
+            _fellBack = true;
             return new TcpRoomTransport();
         }
 
