@@ -166,29 +166,30 @@ public sealed class SoftEtherRoomTransport : IRoomTransport, IConsoleInternetPro
             foreach (var address in peer.Addresses)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                var port = IsRelayAddress(address) ? RelayPort : peer.Port;
                 try
                 {
-                    await _client.ConnectAsync(JoinAccount, address, peer.Port, peer.Hub, peer.Username, peer.Password, NicName, cancellationToken).ConfigureAwait(false);
+                    await _client.ConnectAsync(JoinAccount, address, port, peer.Hub, peer.Username, peer.Password, NicName, cancellationToken).ConfigureAwait(false);
                     var status = await WaitForSessionAsync(JoinAccount, cancellationToken).ConfigureAwait(false);
                     if (status is null)
                     {
-                        _options.Log?.Invoke($"no session via {address}:{peer.Port} within {_options.ConnectTimeout.TotalSeconds:0}s; trying next address");
-                        failures.Add($"{address}:{peer.Port} (no session within {_options.ConnectTimeout.TotalSeconds:0}s)");
+                        _options.Log?.Invoke($"no session via {address}:{port} within {_options.ConnectTimeout.TotalSeconds:0}s; trying next address");
+                        failures.Add($"{address}:{port} (no session within {_options.ConnectTimeout.TotalSeconds:0}s)");
                         await SafeDisconnectAsync(JoinAccount).ConfigureAwait(false);
                         continue;
                     }
 
                     Underlay = status.Underlay;
                     ConnectionKind = IsRelayAddress(address) ? "Relay" : "Direct";
-                    _options.Log?.Invoke($"joined room hub via {address}:{peer.Port} ({ConnectionKind}); underlay: {status.Underlay ?? "unknown"}");
-                    var port = await AttachAsync(cancellationToken).ConfigureAwait(false);
+                    _options.Log?.Invoke($"joined room hub via {address}:{port} ({ConnectionKind}); underlay: {status.Underlay ?? "unknown"}");
+                    var attached = await AttachAsync(cancellationToken).ConfigureAwait(false);
                     await ReapplyBindingsAsync(cancellationToken).ConfigureAwait(false);
                     var generation = Interlocked.Increment(ref _joinGeneration);
-                    return new SoftEtherDataPort(port, () => generation == Volatile.Read(ref _joinGeneration) ? SafeDisconnectAsync(JoinAccount) : Task.CompletedTask);
+                    return new SoftEtherDataPort(attached, () => generation == Volatile.Read(ref _joinGeneration) ? SafeDisconnectAsync(JoinAccount) : Task.CompletedTask);
                 }
                 catch (Exception ex) when (ex is IOException or TimeoutException or InvalidOperationException or SoftEtherRpcException)
                 {
-                    failures.Add($"{address}:{peer.Port} ({ex.Message})");
+                    failures.Add($"{address}:{port} ({ex.Message})");
                     await SafeDisconnectAsync(JoinAccount).ConfigureAwait(false);
                 }
             }
@@ -245,6 +246,8 @@ public sealed class SoftEtherRoomTransport : IRoomTransport, IConsoleInternetPro
 
     public static bool IsRoomHubName(string name)
         => name.Length == 11 && name.StartsWith("COD", StringComparison.Ordinal) && name[3..].All(Uri.IsHexDigit);
+
+    public const int RelayPort = 443;
 
     public static bool IsRelayAddress(string address)
         => address.EndsWith(".vpnazure.net", StringComparison.OrdinalIgnoreCase);

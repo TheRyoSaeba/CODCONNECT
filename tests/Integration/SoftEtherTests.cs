@@ -406,7 +406,8 @@ public class SoftEtherTests
 
         Assert.NotNull(port);
         Assert.Equal(["vpn123.softether.net", "192.168.1.20", "vpn123.vpnazure.net"], client.Connects.Select(c => c.Host));
-        Assert.All(client.Connects, c => Assert.Equal(("codconnect-join", 5555, "CODABCD", "room", "secret", "VPN9"), (c.Account, c.Port, c.Hub, c.User, c.Password, c.Nic)));
+        Assert.All(client.Connects, c => Assert.Equal(("codconnect-join", "CODABCD", "room", "secret", "VPN9"), (c.Account, c.Hub, c.User, c.Password, c.Nic)));
+        Assert.Equal([5555, 5555, 443], client.Connects.Select(c => c.Port));
         Assert.Equal("Relay", transport.ConnectionKind);
 
         await port.DisposeAsync();
