@@ -49,7 +49,7 @@ public class RoomRestoreTests
         var store = new RoomStore();
         var host = store.Create("Host", Endpoint);
 
-        var impostor = new RestoreRoomRequest("0123456789ABCDEF", "aaaaaaaaaaaa", "bbbbbbbbbbbb", "Impostor", Endpoint);
+        var impostor = new RestoreRoomRequest("0123456789ABCDEF", "aaaaaaaaaaaa", "bbbbbbbbbbbb", "Faker", Endpoint);
         Assert.Equal(RestoreResult.Taken, store.Restore(host.RoomCode, impostor));
         Assert.Equal(["Host"], store.Get(host.RoomCode)!.Members.Select(m => m.DisplayName));
     }

@@ -44,7 +44,7 @@ public sealed class RoomStore
 {
     private const int AdminKeyByteCount = 8;
     private const int MemberIdByteCount = 6;
-    public const int MaxDisplayNameLength = 32;
+    public const int MaxDisplayNameLength = 7;
 
     private static readonly byte[] DummyAdminKey = new byte[AdminKeyByteCount * 2];
 
@@ -438,7 +438,7 @@ public sealed class RoomStore
     {
         if (!IsValidName(displayName))
         {
-            throw new ArgumentException("Display name must be 1-32 visible characters.", nameof(displayName));
+            throw new ArgumentException("Display name must be 1-7 visible characters.", nameof(displayName));
         }
     }
 

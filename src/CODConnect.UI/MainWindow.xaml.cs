@@ -216,7 +216,7 @@ public partial class MainWindow : Window
         _actions.Add(hostTab); _actions.Add(joinTab);
         Grid.SetColumn(joinTab, 1); tabs.Children.Add(hostTab); tabs.Children.Add(joinTab); panel.Children.Add(tabs);
         var label = Text("Your name", true, 11); Space(label, _compact ? 12 : 20, 6); panel.Children.Add(label);
-        var name = new TextBox { Text = _vm.DisplayName, MaxLength = 32 }; AutomationProperties.SetName(name, "Your name");
+        var name = new TextBox { Text = _vm.DisplayName, MaxLength = 7 }; AutomationProperties.SetName(name, "Your name");
         name.TextChanged += (_, _) => { _vm.DisplayName = name.Text; RefreshChrome(); }; panel.Children.Add(name);
         TextBox? code = null;
         if (_joining)

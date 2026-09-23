@@ -150,12 +150,12 @@ public class RendezvousApiTests
         for (var i = 0; i < 5; i++)
         {
             using var response = await client.PostAsJsonAsync(
-                $"/v1/rooms/{created.RoomCode}/join", new JoinRequest($"player-{i}"), JsonOptions);
+                $"/v1/rooms/{created.RoomCode}/join", new JoinRequest($"p{i}"), JsonOptions);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
 
         using var overflow = await client.PostAsJsonAsync(
-            $"/v1/rooms/{created.RoomCode}/join", new JoinRequest("one-too-many"), JsonOptions);
+            $"/v1/rooms/{created.RoomCode}/join", new JoinRequest("extra"), JsonOptions);
 
         await AssertJsonErrorAsync(overflow, HttpStatusCode.Conflict, "room full");
     }
