@@ -16,6 +16,13 @@ public sealed record RoomStoreOptions
     public TimeSpan MemberTimeout { get; init; } = TimeSpan.FromSeconds(60);
 }
 
+public enum LookupStatus
+{
+    Found,
+    UnknownRoom,
+    Forbidden,
+}
+
 public enum HeartbeatStatus
 {
     Alive,
@@ -45,6 +52,10 @@ public sealed class RoomStore
     private const int AdminKeyByteCount = 8;
     private const int MemberIdByteCount = 6;
     public const int MaxDisplayNameLength = 7;
+
+    public const int MaxEndpointAddresses = 16;
+
+    public const int MaxEndpointFieldLength = 255;
 
     private static readonly byte[] DummyAdminKey = new byte[AdminKeyByteCount * 2];
 
@@ -108,6 +119,31 @@ public sealed class RoomStore
         lock (entry.Lock)
         {
             return IsDeadLocked(entry) ? null : Snapshot(entry);
+        }
+    }
+
+    public LookupStatus GetForMember(string code, string memberId, string secret, out RoomInfo? info)
+    {
+        info = null;
+        if (!RoomCode.TryValidate(code, out var normalized) || !_rooms.TryGetValue(normalized, out var entry))
+        {
+            return LookupStatus.UnknownRoom;
+        }
+
+        lock (entry.Lock)
+        {
+            if (IsDeadLocked(entry))
+            {
+                return LookupStatus.UnknownRoom;
+            }
+
+            if (!entry.MemberSecrets.TryGetValue(memberId, out var expectedHash) || !CompareHash(expectedHash, secret))
+            {
+                return LookupStatus.Forbidden;
+            }
+
+            info = Snapshot(entry);
+            return LookupStatus.Found;
         }
     }
 
@@ -481,9 +517,13 @@ public sealed class RoomStore
             throw new ArgumentException("Endpoint must carry at least one address and a valid port.", nameof(endpoint));
         }
 
-        if (endpoint.Addresses.Any(string.IsNullOrWhiteSpace))
+        if (endpoint.Addresses.Count > MaxEndpointAddresses
+            || endpoint.Addresses.Any(a => string.IsNullOrWhiteSpace(a) || a.Length > MaxEndpointFieldLength)
+            || endpoint.Hub?.Length > MaxEndpointFieldLength
+            || endpoint.Username?.Length > MaxEndpointFieldLength
+            || endpoint.Password?.Length > MaxEndpointFieldLength)
         {
-            throw new ArgumentException("Endpoint addresses must be non-empty.", nameof(endpoint));
+            throw new ArgumentException("Endpoint addresses must be non-empty and short.", nameof(endpoint));
         }
     }
 

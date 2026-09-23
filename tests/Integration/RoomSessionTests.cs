@@ -1,3 +1,5 @@
+using CODConnect.Rendezvous;
+using Microsoft.Extensions.DependencyInjection;
 using CODConnect.Core.Diagnostics;
 using CODConnect.NetworkSimulation;
 using CODConnect.PacketEngine.Dhcp;
@@ -112,13 +114,13 @@ public class RoomSessionTests
         Assert.DoesNotContain(joinerSession.Devices, d => d.Mac == joinerSession.DataPort.GetMac());
         Assert.Equal("Direct", hostSession.ConnectionKind);
 
-        var rendezvous = new RendezvousClient(factory.CreateClient());
-        var info = await rendezvous.GetRoomAsync(hostSession.RoomCode);
+        var rooms = factory.Services.GetRequiredService<RoomStore>();
+        var info = rooms.Get(hostSession.RoomCode);
         Assert.NotNull(info);
         Assert.Equal(2, info!.MemberCount);
 
         await hostSession.DisposeAsync();
-        Assert.Null(await rendezvous.GetRoomAsync(hostSession.RoomCode));
+        Assert.Null(rooms.Get(hostSession.RoomCode));
 
         Assert.Equal(0, hostSession.Counters.FramesDropped);
         Assert.Equal(0, joinerSession.Counters.FramesDropped);
@@ -206,12 +208,12 @@ public class RoomSessionTests
         using var factory = new WebApplicationFactory<Program>();
         var (host, joiner) = await ConnectedPairAsync(factory);
         await using var _ = host;
-        var rendezvous = new RendezvousClient(factory.CreateClient());
-        Assert.Equal(2, (await rendezvous.GetRoomAsync(host.RoomCode))!.MemberCount);
+        var rooms = factory.Services.GetRequiredService<RoomStore>();
+        Assert.Equal(2, rooms.Get(host.RoomCode)!.MemberCount);
 
         await joiner.DisposeAsync();
 
-        Assert.Equal(1, (await rendezvous.GetRoomAsync(host.RoomCode))!.MemberCount);
+        Assert.Equal(1, rooms.Get(host.RoomCode)!.MemberCount);
     }
 
     [Fact]
@@ -226,7 +228,7 @@ public class RoomSessionTests
         await host.DisposeAsync();
 
         Assert.Equal(LinkState.Down, dataPort.GetLinkState());
-        Assert.Null(await new RendezvousClient(factory.CreateClient()).GetRoomAsync(host.RoomCode));
+        Assert.Null(factory.Services.GetRequiredService<RoomStore>().Get(host.RoomCode));
     }
 
     [Fact]

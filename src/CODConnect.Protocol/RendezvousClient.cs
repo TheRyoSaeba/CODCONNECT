@@ -56,9 +56,12 @@ public sealed class RendezvousClient
             : null;
     }
 
-    public async Task<RoomInfo?> GetRoomAsync(string code, CancellationToken cancellationToken = default)
+    public async Task<RoomInfo?> GetRoomAsync(string code, string memberId, string memberSecret, CancellationToken cancellationToken = default)
     {
-        using var response = await _http.GetAsync($"/v1/rooms/{Uri.EscapeDataString(code)}", cancellationToken).ConfigureAwait(false);
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/v1/rooms/{Uri.EscapeDataString(code)}");
+        request.Headers.Add("X-Member-Id", memberId);
+        request.Headers.Add("X-Member-Secret", memberSecret);
+        using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
         if (response.IsSuccessStatusCode)
         {
             return await response.Content.ReadFromJsonAsync<RoomInfo>(cancellationToken: cancellationToken).ConfigureAwait(false);

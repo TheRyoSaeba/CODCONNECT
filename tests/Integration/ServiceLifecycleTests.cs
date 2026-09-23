@@ -1,3 +1,5 @@
+using CODConnect.Rendezvous;
+using Microsoft.Extensions.DependencyInjection;
 using CODConnect.NetworkSimulation;
 using CODConnect.Protocol;
 using CODConnect.Service;
@@ -26,12 +28,12 @@ public class ServiceLifecycleTests
         var path = TempJournal();
         var crashed = Manager(factory.CreateClient(), HostMac, new SessionJournal(path));
         var code = await crashed.StartHostAsync("Host", adapter: null);
-        var rendezvous = new RendezvousClient(factory.CreateClient());
-        Assert.NotNull(await rendezvous.GetRoomAsync(code));
+        var rooms = factory.Services.GetRequiredService<RoomStore>();
+        Assert.NotNull(rooms.Get(code));
 
         await new SessionJournal(path).RecoverAsync(factory.CreateClient());
 
-        Assert.Null(await rendezvous.GetRoomAsync(code));
+        Assert.Null(rooms.Get(code));
         Assert.Null(new SessionJournal(path).Read());
         await crashed.DisposeAsync();
     }
@@ -46,12 +48,12 @@ public class ServiceLifecycleTests
         var path = TempJournal();
         var crashed = Manager(factory.CreateClient(), JoinMac, new SessionJournal(path));
         await crashed.StartJoinAsync(code, "Friend", adapter: null);
-        var rendezvous = new RendezvousClient(factory.CreateClient());
-        Assert.Equal(2, (await rendezvous.GetRoomAsync(code))!.MemberCount);
+        var rooms = factory.Services.GetRequiredService<RoomStore>();
+        Assert.Equal(2, rooms.Get(code)!.MemberCount);
 
         await new SessionJournal(path).RecoverAsync(factory.CreateClient());
 
-        Assert.Equal(1, (await rendezvous.GetRoomAsync(code))!.MemberCount);
+        Assert.Equal(1, rooms.Get(code)!.MemberCount);
         await crashed.DisposeAsync();
     }
 
@@ -71,7 +73,7 @@ public class ServiceLifecycleTests
         await lifecycle.StopAsync(CancellationToken.None);
 
         Assert.False(sessions.HasSession);
-        Assert.Null(await new RendezvousClient(factory.CreateClient()).GetRoomAsync(code));
+        Assert.Null(factory.Services.GetRequiredService<RoomStore>().Get(code));
         Assert.Null(journal.Read());
     }
 

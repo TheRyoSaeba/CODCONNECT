@@ -217,7 +217,7 @@ public sealed class RoomSession : IAsyncDisposable
         var joined = await rendezvous.JoinRoomAsync(options.RoomCode, options.DisplayName, endpoint: null, cancellationToken).ConfigureAwait(false)
                      ?? throw new InvalidOperationException($"Could not join room {options.RoomCode} (unknown, expired, or full).");
 
-        var peerEndpoints = await WaitForPeerEndpointsAsync(options, rendezvous, joined.MemberId, cancellationToken).ConfigureAwait(false);
+        var peerEndpoints = await WaitForPeerEndpointsAsync(options, rendezvous, joined.MemberId, joined.MemberSecret, cancellationToken).ConfigureAwait(false);
         var port = await options.Transport.JoinAsync(OnlyRelayIfAsked(options, peerEndpoints), cancellationToken).ConfigureAwait(false);
 
         return await WireAsync(options, rendezvous, port, joined.RoomCode, joined.MemberId, joined.MemberSecret, adminKey: null, RoomRole.Joiner, cancellationToken).ConfigureAwait(false);
@@ -459,7 +459,7 @@ public sealed class RoomSession : IAsyncDisposable
         }
         else
         {
-            var room = await _rendezvous.GetRoomAsync(RoomCode, token).ConfigureAwait(false);
+            var room = await _rendezvous.GetRoomAsync(RoomCode, MemberId, MemberSecret, token).ConfigureAwait(false);
             if (room is null)
             {
                 StatusChanged?.Invoke("room closed");
@@ -516,12 +516,12 @@ public sealed class RoomSession : IAsyncDisposable
     }
 
     private static async Task<IReadOnlyList<EndpointInfo>> WaitForPeerEndpointsAsync(
-        RoomSessionOptions options, RendezvousClient rendezvous, string selfMemberId, CancellationToken cancellationToken)
+        RoomSessionOptions options, RendezvousClient rendezvous, string selfMemberId, string selfSecret, CancellationToken cancellationToken)
     {
         var deadline = DateTimeOffset.UtcNow + options.PeerPollTimeout;
         while (DateTimeOffset.UtcNow < deadline)
         {
-            var room = await rendezvous.GetRoomAsync(options.RoomCode!, cancellationToken).ConfigureAwait(false);
+            var room = await rendezvous.GetRoomAsync(options.RoomCode!, selfMemberId, selfSecret, cancellationToken).ConfigureAwait(false);
             if (room is null)
             {
                 throw new InvalidOperationException($"Room {options.RoomCode} disappeared (closed or expired).");
@@ -588,7 +588,7 @@ public sealed class RoomSession : IAsyncDisposable
         session.Chat = new TunnelRoomChat(roomCode + ":" + memberId, memberId, options.DisplayName,
             // While the room server has lost the room (restart), keep the last member list: the
             // host puts the room back within seconds and nobody should flicker out of it.
-            async token => (await rendezvous.GetRoomAsync(roomCode, token).ConfigureAwait(false))?.Members
+            async token => (await rendezvous.GetRoomAsync(roomCode, memberId, memberSecret, token).ConfigureAwait(false))?.Members
                            ?? throw new InvalidOperationException("The room is not listed right now."),
             (frame, token) => session.DataPort is ChatPort port ? port.SendChatAsync(frame, token) : ValueTask.CompletedTask,
             () => session.DataPort.GetLinkState() == LinkState.Up,

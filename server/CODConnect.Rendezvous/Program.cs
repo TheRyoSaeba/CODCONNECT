@@ -4,6 +4,7 @@ using CODConnect.Protocol;
 using CODConnect.Rendezvous;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 16 * 1024);
 
 if (TryGetPositiveInt("PORT", out var port))
 {
@@ -113,8 +114,13 @@ app.MapPost("/v1/rooms/{code}/members/{memberId}/heartbeat", (string code, strin
     };
 });
 
-app.MapPost("/v1/rooms/{code}/restore", (string code, RestoreRoomRequest? request, RoomStore store) =>
+app.MapPost("/v1/rooms/{code}/restore", (HttpContext context, string code, RestoreRoomRequest? request, RoomStore store, RateLimiter limiter) =>
 {
+    if (!limiter.Allow(GetRateLimitKey(context)))
+    {
+        return RateLimited();
+    }
+
     if (request is null)
     {
         return JsonError(StatusCodes.Status400BadRequest, "invalid request");
@@ -135,8 +141,13 @@ app.MapPost("/v1/rooms/{code}/restore", (string code, RestoreRoomRequest? reques
     }
 });
 
-app.MapPost("/v1/rooms/{code}/members/{memberId}/rejoin", (string code, string memberId, RejoinRequest? request, RoomStore store) =>
+app.MapPost("/v1/rooms/{code}/members/{memberId}/rejoin", (HttpContext context, string code, string memberId, RejoinRequest? request, RoomStore store, RateLimiter limiter) =>
 {
+    if (!limiter.Allow(GetRateLimitKey(context)))
+    {
+        return RateLimited();
+    }
+
     if (request is null)
     {
         return JsonError(StatusCodes.Status400BadRequest, "invalid request");
@@ -167,10 +178,16 @@ app.MapDelete("/v1/rooms/{code}/members/{memberId}", (string code, string member
         : JsonError(StatusCodes.Status404NotFound, "not found");
 });
 
-app.MapGet("/v1/rooms/{code}", (string code, RoomStore store) =>
+app.MapGet("/v1/rooms/{code}", (string code, HttpContext context, RoomStore store) =>
 {
-    var info = store.Get(code);
-    return info is null ? Results.NotFound() : Results.Ok(info);
+    var memberId = context.Request.Headers["X-Member-Id"].FirstOrDefault() ?? string.Empty;
+    var secret = context.Request.Headers["X-Member-Secret"].FirstOrDefault() ?? string.Empty;
+    return store.GetForMember(code, memberId, secret, out var info) switch
+    {
+        LookupStatus.Found => Results.Ok(info),
+        LookupStatus.UnknownRoom => Results.NotFound(),
+        _ => JsonError(StatusCodes.Status403Forbidden, "forbidden"),
+    };
 });
 
 app.MapDelete("/v1/rooms/{code}", (string code, HttpContext context, RoomStore store) =>

@@ -62,7 +62,7 @@ public class RendezvousApiTests
             Assert.Equal(created.RoomCode, joined.RoomCode);
             Assert.Equal(created.ExpiresUtc, joined.ExpiresUtc);
 
-            using var getResponse = await client.GetAsync($"/v1/rooms/{created.RoomCode}");
+            using var getResponse = await client.SendAsync(MemberGet(created.RoomCode, joined.MemberId, joined.MemberSecret));
             Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
             var info = await getResponse.Content.ReadFromJsonAsync<RoomInfo>(JsonOptions);
             Assert.NotNull(info);
@@ -78,7 +78,7 @@ public class RendezvousApiTests
             Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
         }
 
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/v1/rooms/{created.RoomCode}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.SendAsync(MemberGet(created.RoomCode, created.MemberId, created.MemberSecret))).StatusCode);
         using (var joinAfterClose = await client.PostAsJsonAsync(
             $"/v1/rooms/{created.RoomCode}/join", new JoinRequest("bob"), JsonOptions))
         {
@@ -180,7 +180,7 @@ public class RendezvousApiTests
             await AssertJsonErrorAsync(missingKeyResponse, HttpStatusCode.Forbidden, "forbidden");
         }
 
-        using var getResponse = await client.GetAsync($"/v1/rooms/{created.RoomCode}");
+        using var getResponse = await client.SendAsync(MemberGet(created.RoomCode, created.MemberId, created.MemberSecret));
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
     }
 
@@ -198,6 +198,33 @@ public class RendezvousApiTests
     }
 
     [Fact]
+    public async Task Get_WithoutMembership_RevealsNothing()
+    {
+        using var factory = CreateFactory(rateLimitPerMinute: null);
+        using var client = factory.CreateClient();
+        var created = await CreateRoomAsync(client);
+
+        using var anonymous = await client.GetAsync($"/v1/rooms/{created.RoomCode}");
+        Assert.DoesNotContain(TestApiEndpoint.Addresses[0], await anonymous.Content.ReadAsStringAsync());
+        await AssertJsonErrorAsync(anonymous, HttpStatusCode.Forbidden, "forbidden");
+
+        using var wrongSecret = await client.SendAsync(MemberGet(created.RoomCode, created.MemberId, "not-the-secret"));
+        await AssertJsonErrorAsync(wrongSecret, HttpStatusCode.Forbidden, "forbidden");
+    }
+
+    [Fact]
+    public async Task OversizedEndpoint_IsRejected()
+    {
+        using var factory = CreateFactory(rateLimitPerMinute: null);
+        using var client = factory.CreateClient();
+        var tooMany = new EndpointInfo(Enumerable.Range(0, 17).Select(i => $"10.0.0.{i}").ToArray(), 5555);
+        var tooLong = new EndpointInfo([new string('a', 256)], 5555);
+
+        await AssertJsonErrorAsync(await client.PostAsJsonAsync("/v1/rooms", new CreateRoomRequest("h1", tooMany), JsonOptions), HttpStatusCode.BadRequest, "invalid request");
+        await AssertJsonErrorAsync(await client.PostAsJsonAsync("/v1/rooms", new CreateRoomRequest("h2", tooLong), JsonOptions), HttpStatusCode.BadRequest, "invalid request");
+    }
+
+    [Fact]
     public async Task Get_IsNotRateLimited()
     {
         using var factory = CreateFactory(rateLimitPerMinute: "1");
@@ -206,7 +233,7 @@ public class RendezvousApiTests
 
         for (var i = 0; i < 5; i++)
         {
-            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/v1/rooms/{created.RoomCode}")).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(MemberGet(created.RoomCode, created.MemberId, created.MemberSecret))).StatusCode);
         }
     }
 
@@ -227,11 +254,11 @@ public class RendezvousApiTests
 
         Assert.True(await rendezvous.LeaveAsync(created.RoomCode, joined.MemberId, joined.MemberSecret));
         Assert.Equal(HeartbeatResult.MemberGone, await rendezvous.HeartbeatAsync(created.RoomCode, joined.MemberId, joined.MemberSecret));
-        Assert.Equal(1, (await rendezvous.GetRoomAsync(created.RoomCode))!.MemberCount);
+        Assert.Equal(1, (await rendezvous.GetRoomAsync(created.RoomCode, created.MemberId, created.MemberSecret))!.MemberCount);
 
         Assert.True(await rendezvous.LeaveAsync(created.RoomCode, created.MemberId, created.MemberSecret));
         Assert.Equal(HeartbeatResult.RoomClosed, await rendezvous.HeartbeatAsync(created.RoomCode, created.MemberId, created.MemberSecret));
-        Assert.Null(await rendezvous.GetRoomAsync(created.RoomCode));
+        Assert.Null(await rendezvous.GetRoomAsync(created.RoomCode, created.MemberId, created.MemberSecret));
     }
 
     [Fact]
@@ -246,5 +273,13 @@ public class RendezvousApiTests
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             => Task.FromResult(new HttpResponseMessage(status));
+    }
+
+    private static HttpRequestMessage MemberGet(string code, string memberId, string secret)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, $"/v1/rooms/{code}");
+        request.Headers.Add("X-Member-Id", memberId);
+        request.Headers.Add("X-Member-Secret", secret);
+        return request;
     }
 }

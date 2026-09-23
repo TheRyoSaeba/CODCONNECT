@@ -1,3 +1,5 @@
+using CODConnect.Rendezvous;
+using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Concurrent;
 using CODConnect.Core.Diagnostics;
 using CODConnect.NetworkSimulation;
@@ -134,14 +136,14 @@ public class ReconnectTests
         var updated = await client.UpdateEndpointAsync(created.RoomCode, created.MemberId, created.MemberSecret, new EndpointInfo(["10.0.0.9"], 49999));
         Assert.True(updated);
 
-        var info = await client.GetRoomAsync(created.RoomCode);
+        var info = await client.GetRoomAsync(created.RoomCode, created.MemberId, created.MemberSecret);
         var host = info!.Members.Single(m => m.MemberId == created.MemberId);
         Assert.Equal("10.0.0.9", host.Endpoint!.Addresses[0]);
         Assert.Equal(49999, host.Endpoint.Port);
 
         var rejected = await client.UpdateEndpointAsync(created.RoomCode, created.MemberId, "wrong-secret", new EndpointInfo(["10.0.0.8"], 40000));
         Assert.False(rejected);
-        var after = await client.GetRoomAsync(created.RoomCode);
+        var after = await client.GetRoomAsync(created.RoomCode, created.MemberId, created.MemberSecret);
         Assert.Equal("10.0.0.9", after!.Members.Single(m => m.MemberId == created.MemberId).Endpoint!.Addresses[0]);
     }
 
@@ -171,8 +173,7 @@ public class ReconnectTests
         Assert.True(await WaitForTrueAsync(() => transport.HostCalls >= 2));
         Assert.True(await WaitForAsync(() =>
         {
-            var client = new RendezvousClient(factory.CreateClient());
-            return client.GetRoomAsync(originalCode).GetAwaiter().GetResult() is { } info
+            return factory.Services.GetRequiredService<RoomStore>().Get(originalCode) is { } info
                 && info.Members.Single(m => m.MemberId == session.MemberId).Endpoint!.Port
                     == 40000 + transport.HostCalls;
         }));

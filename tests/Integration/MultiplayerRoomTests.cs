@@ -1,3 +1,5 @@
+using CODConnect.Rendezvous;
+using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Concurrent;
 using CODConnect.PacketEngine.Dhcp;
 using CODConnect.Protocol;
@@ -253,9 +255,8 @@ public sealed class MultiplayerRoomTests
             server = new WebApplicationFactory<Program>();
             old.Dispose();
 
-            var rendezvous = new RendezvousClient(new HttpClient(new CurrentServerHandler(Current)) { BaseAddress = baseAddress });
-            await WaitAsync(() => rendezvous.GetRoomAsync(host.Session.RoomCode).GetAwaiter().GetResult()?.MemberCount == 3,
-                () => $"room not back: {rendezvous.GetRoomAsync(host.Session.RoomCode).GetAwaiter().GetResult()?.MemberCount}", seconds: 30);
+            await WaitAsync(() => server.Services.GetRequiredService<RoomStore>().Get(host.Session.RoomCode)?.MemberCount == 3,
+                () => $"room not back: {server.Services.GetRequiredService<RoomStore>().Get(host.Session.RoomCode)?.MemberCount}", seconds: 30);
             Assert.Empty(ended);
             foreach (var pc in pcs) Assert.True(pc.Session.Players.All(p => p.Connected), Describe(pc));
 

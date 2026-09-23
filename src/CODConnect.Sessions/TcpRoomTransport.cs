@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 
@@ -57,7 +58,8 @@ public sealed class TcpRoomTransport : IRoomTransport
 
     internal static IReadOnlyList<string> AdvertiseAddresses()
     {
-        var addresses = new List<string>();
+        var routed = new List<string>();
+        var all = new List<string>();
         foreach (var networkInterface in NetworkInterface.GetAllNetworkInterfaces())
         {
             if (networkInterface.OperationalStatus != OperationalStatus.Up
@@ -66,7 +68,10 @@ public sealed class TcpRoomTransport : IRoomTransport
                 continue;
             }
 
-            foreach (var address in networkInterface.GetIPProperties().UnicastAddresses)
+            var properties = networkInterface.GetIPProperties();
+            var hasGateway = properties.GatewayAddresses.Any(g =>
+                g.Address.AddressFamily == AddressFamily.InterNetwork && !g.Address.Equals(IPAddress.Any));
+            foreach (var address in properties.UnicastAddresses)
             {
                 if (address.Address.AddressFamily != AddressFamily.InterNetwork)
                 {
@@ -76,11 +81,15 @@ public sealed class TcpRoomTransport : IRoomTransport
                 var text = address.Address.ToString();
                 if (!text.StartsWith("169.254.") && !text.StartsWith("10.42.0.") && !text.StartsWith("192.168.137."))
                 {
-                    addresses.Add(text);
+                    all.Add(text);
+                    if (hasGateway)
+                    {
+                        routed.Add(text);
+                    }
                 }
             }
         }
 
-        return addresses;
+        return routed.Count > 0 ? routed : all;
     }
 }
