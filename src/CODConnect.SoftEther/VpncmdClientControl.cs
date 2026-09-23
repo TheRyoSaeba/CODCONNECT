@@ -88,6 +88,7 @@ public sealed class VpncmdClientControl : ISoftEtherClientControl
 
         Expect(await _run(["AccountCreate", accountName, $"/SERVER:{host}:{port}", $"/HUB:{hubName}", $"/USERNAME:{userName}", $"/NICNAME:{nicName}"], cancellationToken).ConfigureAwait(false), "AccountCreate");
         Expect(await _run(["AccountPasswordSet", accountName, $"/PASSWORD:{password}", "/TYPE:standard"], cancellationToken).ConfigureAwait(false), "AccountPasswordSet");
+        Expect(await _run(["AccountDetailSet", accountName, "/MAXTCP:1", "/INTERVAL:1", "/TTL:0", "/HALF:no", "/BRIDGE:no", "/MONITOR:no", "/NOTRACK:yes", "/NOQOS:no"], cancellationToken).ConfigureAwait(false), "AccountDetailSet");
         Expect(await _run(["AccountConnect", accountName], cancellationToken).ConfigureAwait(false), "AccountConnect");
     }
 
@@ -126,7 +127,11 @@ public sealed class VpncmdClientControl : ISoftEtherClientControl
         var script =
             $"$a = Get-NetAdapter -ErrorAction Stop | Where-Object {{ $_.Name -eq '{nicName} - VPN Client' -or $_.InterfaceDescription -eq 'VPN Client Adapter - {nicName}' }}; " +
             "if (-not $a) { exit 2 }; " +
-            "$a | Disable-NetAdapterBinding -ComponentID ms_tcpip,ms_tcpip6,ms_msclient,ms_server,ms_lltdio,ms_rspndr -ErrorAction Stop; exit 0";
+            "$a | Disable-NetAdapterBinding -ComponentID ms_tcpip,ms_tcpip6,ms_msclient,ms_server,ms_lltdio,ms_rspndr -ErrorAction Stop; " +
+            "Get-NetIPInterface -InterfaceIndex $a.ifIndex -ErrorAction SilentlyContinue | Set-NetIPInterface -Dhcp Disabled -RouterDiscovery Disabled -InterfaceMetric 9999 -ErrorAction SilentlyContinue; " +
+            "Get-NetIPAddress -InterfaceIndex $a.ifIndex -ErrorAction SilentlyContinue | Remove-NetIPAddress -Confirm:$false -ErrorAction SilentlyContinue; " +
+            "Get-NetRoute -InterfaceIndex $a.ifIndex -ErrorAction SilentlyContinue | Where-Object { $_.DestinationPrefix -in '0.0.0.0/0', '::/0' } | Remove-NetRoute -Confirm:$false -ErrorAction SilentlyContinue; " +
+            "exit 0";
         var info = new ProcessStartInfo
         {
             FileName = "powershell.exe",

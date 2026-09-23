@@ -43,7 +43,7 @@ public sealed class RendezvousClient
             throw new InvalidOperationException(
                 reason.Contains("name taken", StringComparison.OrdinalIgnoreCase) ? $"Someone in that room is already called {displayName}. Choose another name."
                 : reason.Contains("room full", StringComparison.OrdinalIgnoreCase) ? "That room is full."
-                : "Use a name of 1-7 ordinary characters.");
+                : "Use a name of 1-12 ordinary characters.");
         }
 
         if (!response.IsSuccessStatusCode && response.StatusCode is not System.Net.HttpStatusCode.NotFound)

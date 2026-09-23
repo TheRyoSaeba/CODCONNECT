@@ -122,16 +122,16 @@ public class RoomStoreTests
     }
 
     [Fact]
-    public void Join_RejectsNamesOver7Chars_ButAccepts7()
+    public void Join_RejectsNamesOver12Chars_ButAccepts12()
     {
         var store = new RoomStore(new RoomStoreOptions(), new FakeTimeProvider());
         var created = store.Create("host", TestEndpoint);
 
-        Assert.Equal(JoinStatus.InvalidName, store.Join(created.RoomCode, new string('x', 8), null).Status);
+        Assert.Equal(JoinStatus.InvalidName, store.Join(created.RoomCode, new string('x', 13), null).Status);
         Assert.Equal(JoinStatus.InvalidName, store.Join(created.RoomCode, new string('x', 100), null).Status);
         Assert.Equal(1, store.Get(created.RoomCode)!.MemberCount);
 
-        Assert.Equal(JoinStatus.Joined, store.Join(created.RoomCode, new string('x', 7), null).Status);
+        Assert.Equal(JoinStatus.Joined, store.Join(created.RoomCode, new string('x', 12), null).Status);
         Assert.Equal(2, store.Get(created.RoomCode)!.MemberCount);
     }
 

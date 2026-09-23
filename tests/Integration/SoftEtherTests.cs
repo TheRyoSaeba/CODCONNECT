@@ -504,6 +504,7 @@ public class SoftEtherTests
                 "AccountDelete codconnect-join",
                 "AccountCreate codconnect-join /SERVER:host.example:5555 /HUB:CODABCD /USERNAME:room /NICNAME:VPN9",
                 "AccountPasswordSet codconnect-join /PASSWORD:pw /TYPE:standard",
+                "AccountDetailSet codconnect-join /MAXTCP:1 /INTERVAL:1 /TTL:0 /HALF:no /BRIDGE:no /MONITOR:no /NOTRACK:yes /NOQOS:no",
                 "AccountConnect codconnect-join",
             ],
             calls);
