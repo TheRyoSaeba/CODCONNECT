@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\CODConnect.Core\CODConnect.Core.csproj" />
+    <ProjectReference Include="..\CODConnect.Discovery\CODConnect.Discovery.csproj" />
+    <ProjectReference Include="..\CODConnect.Networking\CODConnect.Networking.csproj" />
+    <ProjectReference Include="..\CODConnect.Protocol\CODConnect.Protocol.csproj" />
+    <ProjectReference Include="..\CODConnect.PacketEngine\CODConnect.PacketEngine.csproj" />
+    <ProjectReference Include="..\CODConnect.SoftEther\CODConnect.SoftEther.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

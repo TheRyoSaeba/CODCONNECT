@@ -1,0 +1,34 @@
+<Solution>
+  <Folder Name="/server/">
+    <Project Path="server/CODConnect.Rendezvous.Tests/CODConnect.Rendezvous.Tests.csproj" />
+    <Project Path="server/CODConnect.Rendezvous/CODConnect.Rendezvous.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/CODConnect.Core/CODConnect.Core.csproj" />
+    <Project Path="src/CODConnect.Discovery/CODConnect.Discovery.csproj" />
+    <Project Path="src/CODConnect.Networking/CODConnect.Networking.csproj" />
+    <Project Path="src/CODConnect.PacketEngine/CODConnect.PacketEngine.csproj" />
+    <Project Path="src/CODConnect.Protocol/CODConnect.Protocol.csproj" />
+    <Project Path="src/CODConnect.Service/CODConnect.Service.csproj" />
+    <Project Path="src/CODConnect.Sessions/CODConnect.Sessions.csproj" />
+    <Project Path="src/CODConnect.SoftEther/CODConnect.SoftEther.csproj" />
+    <Project Path="src/CODConnect.UI/CODConnect.UI.csproj" />
+    <Project Path="src/CODConnect.Wifi/CODConnect.Wifi.csproj" />
+  </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/Integration/">
+    <Project Path="tests/Integration/CODConnect.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/NetworkSimulation/">
+    <Project Path="tests/NetworkSimulation/CODConnect.NetworkSimulation.csproj" />
+  </Folder>
+  <Folder Name="/tests/Protocol.Tests/">
+    <Project Path="tests/Protocol.Tests/CODConnect.Protocol.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Unit/">
+    <Project Path="tests/Unit/CODConnect.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/CODConnect.PocTool/CODConnect.PocTool.csproj" />
+  </Folder>
+</Solution>

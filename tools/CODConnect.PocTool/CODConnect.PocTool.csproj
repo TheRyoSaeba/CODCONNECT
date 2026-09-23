@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CODConnect.Core\CODConnect.Core.csproj" />
+    <ProjectReference Include="..\..\src\CODConnect.Networking\CODConnect.Networking.csproj" />
+    <ProjectReference Include="..\..\src\CODConnect.PacketEngine\CODConnect.PacketEngine.csproj" />
+    <ProjectReference Include="..\..\src\CODConnect.Discovery\CODConnect.Discovery.csproj" />
+    <ProjectReference Include="..\..\src\CODConnect.Protocol\CODConnect.Protocol.csproj" />
+    <ProjectReference Include="..\..\src\CODConnect.Wifi\CODConnect.Wifi.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

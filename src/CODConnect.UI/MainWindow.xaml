@@ -1,0 +1,45 @@
+<Window x:Class="CODConnect.UI.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:CODConnect.UI"
+ Title="CODConnect" Width="1180" Height="720" MinWidth="900" MinHeight="620" MaxWidth="1280" MaxHeight="720" WindowStartupLocation="CenterScreen" Background="{StaticResource BgBrush}" Foreground="{StaticResource TextBrush}" FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="13" UseLayoutRounding="True" WindowStyle="None" ResizeMode="CanResize">
+ <WindowChrome.WindowChrome><WindowChrome CaptionHeight="40" ResizeBorderThickness="6" GlassFrameThickness="0" UseAeroCaptionButtons="False"/></WindowChrome.WindowChrome>
+ <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
+  <Grid>
+   <Grid.RowDefinitions><RowDefinition Height="40"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+   <Grid Background="{StaticResource PanelBrush}">
+    <TextBlock Text="CODConnect" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="23,0" VerticalAlignment="Center"/>
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" WindowChrome.IsHitTestVisibleInChrome="True">
+     <Button x:Name="MinimizeButton" Content="&#xE921;" FontFamily="Segoe MDL2 Assets" Width="44" BorderThickness="0" AutomationProperties.Name="Minimize"/>
+     <Button x:Name="CloseButton" Content="&#xE8BB;" FontFamily="Segoe MDL2 Assets" Width="44" BorderThickness="0" AutomationProperties.Name="Close"/>
+    </StackPanel>
+   </Grid>
+   <Grid Grid.Row="1">
+    <Grid.ColumnDefinitions><ColumnDefinition Width="68"/><ColumnDefinition Width="*"/><ColumnDefinition Width="320"/></Grid.ColumnDefinitions>
+    <Border Background="{StaticResource PanelBrush}" BorderBrush="#111114" BorderThickness="0,0,1,0">
+     <DockPanel>
+      <Viewbox DockPanel.Dock="Top" Width="26" Height="30" Margin="0,20,0,0"><Canvas Width="28" Height="30"><Path Data="M 2,24 L 10,5 L 18,5 L 10,24 Z" Fill="{StaticResource AccentBrush}"/><Path Data="M 11,5 L 19,5 L 27,24 L 19,24 Z" Fill="#497B84"/></Canvas></Viewbox>
+      <Button x:Name="HelpButton" DockPanel.Dock="Bottom" Style="{StaticResource NavButton}" Content="?" ToolTip="Setup guide" AutomationProperties.Name="Setup guide" Margin="0,0,0,20"/>
+      <StackPanel VerticalAlignment="Center">
+       <Button x:Name="RoomNav" Style="{StaticResource NavButton}" ToolTip="Room" AutomationProperties.Name="Room"><Path Width="17" Height="17" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.2" Data="M 6,1 L 11,1 11,6 6,6 Z M 1,11 L 6,11 6,16 1,16 Z M 11,11 L 16,11 16,16 11,16 Z M 8.5,6 L 8.5,8.5 M 3.5,11 L 3.5,8.5 13.5,8.5 13.5,11"/></Button>
+       <Button x:Name="AdaptersNav" Style="{StaticResource NavButton}" ToolTip="Connections" AutomationProperties.Name="Connections"><Path Width="17" Height="17" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.2" Data="M 2,1 L 15,1 15,11 11,11 11,15 6,15 6,11 2,11 Z M 5,4 L 5,7 M 8.5,4 L 8.5,7 M 12,4 L 12,7"/></Button>
+       <Button x:Name="DiagnosticsNav" Style="{StaticResource NavButton}" ToolTip="Diagnostics" AutomationProperties.Name="Diagnostics"><Path Width="19" Height="17" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.2" Data="M 0,9 L 4,9 7,2 11,15 14,7 16,9 19,9"/></Button>
+       <Button x:Name="ChatNav" Style="{StaticResource NavButton}" ToolTip="Room chat" AutomationProperties.Name="Room chat"><Grid><Path Width="18" Height="18" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.2" Data="M 2,2 L 16,2 16,12 8,12 3,16 3,12 2,12 Z M 5,6 L 13,6 M 5,9 L 10,9"/><Ellipse x:Name="ChatUnreadDot" Width="7" Height="7" Fill="{StaticResource AccentBrush}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-3,-4,0" Visibility="Collapsed"/></Grid></Button>
+       <Button x:Name="DevNav" Style="{StaticResource NavButton}" ToolTip="Optional features" AutomationProperties.Name="Optional features"><Path Width="18" Height="15" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.2" Data="M 5,2 L 1,7.5 5,13 M 13,2 L 17,7.5 13,13 M 10,1 L 8,14"/></Button>
+      </StackPanel>
+     </DockPanel>
+    </Border>
+    <Grid Grid.Column="1">
+     <Grid.RowDefinitions><RowDefinition Height="74"/><RowDefinition Height="*"/><RowDefinition Height="40"/></Grid.RowDefinitions>
+     <Grid Margin="28,0">
+      <TextBlock x:Name="PageTitle" Text="Your network" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+      <Border HorizontalAlignment="Right" VerticalAlignment="Center" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="12" Padding="10,4"><TextBlock x:Name="NetworkBadge" Text="Not connected" FontSize="10" Foreground="{StaticResource MutedBrush}"/></Border>
+     </Grid>
+     <Grid Grid.Row="1" x:Name="NetworkView"><local:NetworkDiagram x:Name="Diagram" Margin="8,0"/></Grid>
+     <Grid x:Name="DetailView" Grid.Row="1" Margin="28,16,28,0" Visibility="Collapsed"><StackPanel x:Name="DetailContent"/></Grid>
+     <TextBlock x:Name="CanvasHint" Grid.Row="2" Visibility="Collapsed" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="28,0" VerticalAlignment="Center"/>
+    </Grid>
+    <Border Grid.Column="2" Background="{StaticResource PanelBrush}" BorderBrush="#111114" BorderThickness="1,0,0,0">
+     <ContentControl x:Name="ScreenHost" Margin="26,27,26,20" HorizontalContentAlignment="Stretch"/>
+    </Border>
+   </Grid>
+  </Grid>
+ </Border>
+</Window>

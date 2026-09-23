@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: codconnect-rendezvous
+    runtime: docker
+    plan: free
+    dockerfilePath: ./server/CODConnect.Rendezvous/Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    buildFilter:
+      paths:
+        - server/CODConnect.Rendezvous/**
+        - src/CODConnect.Protocol/**
+        - src/CODConnect.Core/**
+        - Directory.Build.props
+        - render.yaml
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production

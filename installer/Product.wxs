@@ -1,0 +1,106 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <Package
+      Name="CODConnect"
+      Manufacturer="CODConnect Project"
+      Version="$(var.ProductVersion)"
+      UpgradeCode="6B3F5C72-1D4A-4E9B-9C8E-2A7D51F0C0DC"
+      Scope="perMachine"
+      Compressed="yes">
+
+    <SummaryInformation Description="CODConnect - virtual LAN for console gaming" />
+
+    <Property Id="ARPPRODUCTICON" Value="CodConnectIcon.exe" />
+    <Property Id="ARPNOREPAIR" Value="1" />
+    <Property Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
+    <Icon Id="CodConnectIcon.exe" SourceFile="$(var.AppIcon)" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of CODConnect is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+
+    <Feature Id="Main" Title="CODConnect" Level="1">
+      <ComponentGroupRef Id="AppComponents" />
+      <ComponentGroupRef Id="PrereqComponents" />
+      <ComponentGroupRef Id="SoftEtherPayloads" />
+    </Feature>
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="CODConnect">
+        <Directory Id="PrereqDir" Name="prereqs">
+          <Directory Id="SoftEtherServerPayloadDir" Name="softether-server" />
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="AppMenuDir" Name="CODConnect" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="AppComponents" Directory="INSTALLFOLDER">
+      <Component Id="UiExe" Guid="8A1D2C34-5E6F-4A70-9B21-3C4D5E6F7A80">
+        <File Id="UiExeFile" Name="CODConnect.UI.exe" Source="$(var.UiExe)" KeyPath="yes" />
+        <Shortcut Id="UiShortcut" Directory="AppMenuDir" Name="CODConnect"
+                  WorkingDirectory="INSTALLFOLDER" Advertise="no" Target="[#UiExeFile]"
+                  Icon="CodConnectIcon.exe" IconIndex="0" />
+        <RemoveFolder Id="RemoveAppMenuDir" Directory="AppMenuDir" On="uninstall" />
+        <RegistryValue Root="HKMU" Key="Software\CODConnect\Shortcut"
+                       Name="installed" Type="integer" Value="1" />
+      </Component>
+
+      <Component Id="ServiceExe" Guid="9B2E3D45-6F70-4B81-AC32-4D5E6F7A8B91">
+        <File Id="ServiceExeFile" Name="CODConnect.Service.exe" Source="$(var.ServiceExe)" KeyPath="yes" />
+        <ServiceInstall Id="ServiceInstall" Name="CODConnect" DisplayName="CODConnect Service"
+                        Description="Connects game consoles in different homes as one LAN."
+                        Type="ownProcess" Start="auto" ErrorControl="normal" Vital="yes">
+          <util:ServiceConfig FirstFailureActionType="restart" SecondFailureActionType="restart"
+                              ThirdFailureActionType="restart" RestartServiceDelayInSeconds="5" ResetPeriodInDays="1" />
+        </ServiceInstall>
+        <ServiceControl Id="ServiceControl" Name="CODConnect" Start="install" Stop="both" Remove="uninstall"
+                        Wait="yes" />
+        <Environment Id="RendezvousEnv" Name="CODCONNECT_RENDEZVOUS_URL" Value="$(var.RendezvousUrl)"
+                     Part="all" Action="set" System="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <ComponentGroup Id="PrereqComponents" Directory="PrereqDir">
+      <?if $(var.IncludePrereqs) = true ?>
+      <?if $(var.IncludeNpcap) = true ?>
+      <Component Id="NpcapPayload" Guid="AC3F4E56-7081-4C92-BD43-5E6F7A8B9CA2">
+        <File Id="NpcapPayloadFile" Name="npcap-installer.exe" Source="$(var.NpcapPayload)" KeyPath="yes" />
+      </Component>
+      <?endif?>
+      <Component Id="SoftEtherClientPayload" Guid="BD405F67-8192-4DA3-CE54-6F7A8B9CADB3">
+        <File Id="SoftEtherClientPayloadFile" Name="softether-vpnclient-installer.exe" Source="$(var.SoftEtherClientPayload)" KeyPath="yes" />
+      </Component>
+      <?endif?>
+    </ComponentGroup>
+
+    <ComponentGroup Id="SoftEtherPayloads">
+      <?if $(var.IncludePrereqs) = true ?>
+      <Files Include="$(var.SoftEtherServerDir)\**" Directory="SoftEtherServerPayloadDir" />
+      <?endif?>
+    </ComponentGroup>
+
+    <?if $(var.IncludePrereqs) = true ?>
+    <Property Id="SOFTETHERCLIENTPRESENT">
+      <RegistrySearch Id="SoftEtherClientUninstallSearch" Root="HKLM" Bitness="always64"
+                      Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\softether_sevpnclient"
+                      Name="DisplayName" Type="raw" />
+    </Property>
+    <CustomAction Id="RunSoftEtherClientSetup" FileRef="SoftEtherClientPayloadFile" ExeCommand=""
+                  Execute="immediate" Return="asyncNoWait" Impersonate="yes" />
+    <UI>
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="RunSoftEtherClientSetup"
+               Condition="NOT Installed AND NOT SOFTETHERCLIENTPRESENT" />
+    </UI>
+    <?endif?>
+
+    <CustomAction Id="UninstallCleanup" FileRef="ServiceExeFile" ExeCommand="--uninstall-cleanup"
+                  Execute="deferred" Impersonate="no" Return="ignore" />
+    <InstallExecuteSequence>
+      <Custom Action="UninstallCleanup" After="StopServices" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+    </InstallExecuteSequence>
+
+  </Package>
+</Wix>

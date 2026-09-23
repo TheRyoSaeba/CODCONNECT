@@ -1,0 +1,52 @@
+namespace CODConnect.Discovery;
+
+public static class PlayStationOui
+{
+    public static readonly IReadOnlyList<string> Prefixes =
+    [
+        "00041F",
+        "001315",
+        "0015C1",
+        "0019C5",
+        "001D0D",
+        "001FA7",
+        "00248D",
+        "00D9D1",
+        "00E421",
+        "04F778",
+        "0C7043",
+        "0CFE45",
+        "280DFC",
+        "2840DD",
+        "2C9E00",
+        "2CCC44",
+        "50B03B",
+        "54E6FD",
+        "5C843C",
+        "5C9666",
+        "68286C",
+        "70662A",
+        "709E29",
+        "78C881",
+        "84E657",
+        "904748",
+        "98FA2E",
+        "9C37CB",
+        "A8E3EE",
+        "B40AD8",
+        "B41F4D",
+        "BC3329",
+        "BC60A7",
+        "C0151B",
+        "C84AA0",
+        "C863F1",
+        "D4F7D5",
+        "E86E3A",
+        "EC748C",
+        "F46412",
+        "F8461C",
+        "F8D0AC",
+        "FC0FE6",
+        "FCCA40"
+    ];
+}
