@@ -288,7 +288,7 @@ public sealed class TunnelRoomChatTests
             (frame, _) => { b!.ReceiveFrame(frame.ToArray()); return ValueTask.CompletedTask; }, () => true);
         b = new TunnelRoomChat("room:b", Sam.MemberId, Sam.DisplayName, _ => Task.FromResult(members),
             (frame, _) => { a.ReceiveFrame(frame.ToArray()); return ValueTask.CompletedTask; }, () => true,
-            self: () => (samConsole, true));
+            self: () => (samConsole, true, "PS4"));
         await using var _ = a;
         await using var __ = b;
         a.Start();
@@ -301,6 +301,7 @@ public sealed class TunnelRoomChatTests
         Assert.Equal(["Sam", "Kim"], peers.Select(p => p.Name));
         var sam = peers[0];
         Assert.Equal(("28:66:E3:51:7B:01", true), (sam.ConsoleMac, sam.Relay));
+        Assert.Equal("PS4", a.ConsoleNameOf(Sam.MemberId));
         Assert.False(peers[1].Connected);
         Assert.Null(peers[1].ConsoleMac);
 

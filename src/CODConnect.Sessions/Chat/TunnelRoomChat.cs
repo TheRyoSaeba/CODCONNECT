@@ -11,6 +11,7 @@ public sealed class TunnelRoomChat : IAsyncDisposable
     private const int Header = 25;
     private const int MaxPeers = 7;
     private const byte TypeHello = 1, TypeMessage = 3, TypeAck = 4;
+    private const int MaxConsoleName = 16;
     private static readonly byte[] Broadcast = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
     private static ReadOnlySpan<byte> Magic => "CODCHAT2"u8;
     private static readonly TimeSpan HelloInterval = TimeSpan.FromSeconds(2);
@@ -23,7 +24,7 @@ public sealed class TunnelRoomChat : IAsyncDisposable
     private readonly Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> _sendFrame;
     private readonly Func<bool> _linkUp;
     private readonly Func<bool> _encrypted;
-    private readonly Func<(byte[]? ConsoleMac, bool Relay)> _self;
+    private readonly Func<(byte[]? ConsoleMac, bool Relay, string? Console)> _self;
     private readonly Func<DateTimeOffset> _clock;
     private readonly byte[] _mac;
     private readonly object _gate = new();
@@ -48,9 +49,9 @@ public sealed class TunnelRoomChat : IAsyncDisposable
         Func<bool> linkUp,
         Func<bool>? encrypted = null,
         Func<DateTimeOffset>? clock = null,
-        Func<(byte[]? ConsoleMac, bool Relay)>? self = null)
+        Func<(byte[]? ConsoleMac, bool Relay, string? Console)>? self = null)
     {
-        _self = self ?? (() => (null, false));
+        _self = self ?? (() => (null, false, null));
         _roomId = roomId;
         _memberId = memberId;
         _name = name;
@@ -133,7 +134,10 @@ public sealed class TunnelRoomChat : IAsyncDisposable
                 case TypeHello when payload.Length >= 12:
                     var consoleMac = payload.Length >= 19 && payload.AsSpan(12, 6).ContainsAnyExcept((byte)0) ? payload[12..18] : null;
                     var relay = payload.Length >= 19 && (payload[18] & 1) != 0;
-                    OnHelloLocked(Encoding.ASCII.GetString(payload, 0, 12), source, now, consoleMac, relay);
+                    var consoleName = consoleMac is not null && payload.Length >= 20 && payload[19] is > 0 and <= MaxConsoleName && payload.Length >= 20 + payload[19]
+                        ? Encoding.ASCII.GetString(payload, 20, payload[19])
+                        : null;
+                    OnHelloLocked(Encoding.ASCII.GetString(payload, 0, 12), source, now, consoleMac, relay, consoleName);
                     break;
 
                 case TypeMessage when payload.Length >= 9 && span.Slice(0, 6).SequenceEqual(_mac):
@@ -245,7 +249,7 @@ public sealed class TunnelRoomChat : IAsyncDisposable
             .ToArray();
     }
 
-    private void OnHelloLocked(string memberId, byte[] source, DateTimeOffset now, byte[]? consoleMac, bool relay)
+    private void OnHelloLocked(string memberId, byte[] source, DateTimeOffset now, byte[]? consoleMac, bool relay, string? consoleName)
     {
         if (memberId == _memberId)
         {
@@ -263,6 +267,7 @@ public sealed class TunnelRoomChat : IAsyncDisposable
             peer.LastHello = now;
             peer.Name = member?.DisplayName ?? peer.Name;
             peer.ConsoleMac = consoleMac;
+            peer.ConsoleName = consoleName;
             peer.Relay = relay;
             return;
         }
@@ -277,7 +282,7 @@ public sealed class TunnelRoomChat : IAsyncDisposable
             return;
         }
 
-        _peers[memberId] = new Peer(memberId, member.DisplayName, source) { LastHello = now, ConsoleMac = consoleMac, Relay = relay };
+        _peers[memberId] = new Peer(memberId, member.DisplayName, source) { LastHello = now, ConsoleMac = consoleMac, ConsoleName = consoleName, Relay = relay };
     }
 
     private List<byte[]>? OnMessageLocked(byte[] source, byte[] payload, DateTimeOffset now)
@@ -400,16 +405,27 @@ public sealed class TunnelRoomChat : IAsyncDisposable
 
     private byte[] HelloPayload()
     {
-        var payload = new byte[19];
+        var (consoleMac, relay, console) = _self();
+        var name = console is null ? [] : Encoding.ASCII.GetBytes(new string(console.Where(c => c is >= ' ' and <= '~').Take(MaxConsoleName).ToArray()));
+        var payload = new byte[20 + name.Length];
         Encoding.ASCII.GetBytes(_memberId.PadRight(12)[..12]).CopyTo(payload, 0);
-        var (consoleMac, relay) = _self();
         if (consoleMac is { Length: 6 })
         {
             consoleMac.CopyTo(payload, 12);
         }
 
         payload[18] = (byte)(relay ? 1 : 0);
+        payload[19] = (byte)name.Length;
+        name.CopyTo(payload, 20);
         return payload;
+    }
+
+    public string? ConsoleNameOf(string memberId)
+    {
+        lock (_gate)
+        {
+            return _peers.TryGetValue(memberId, out var peer) ? peer.ConsoleName : null;
+        }
     }
 
     private async Task MembershipLoopAsync()
@@ -506,6 +522,7 @@ public sealed class TunnelRoomChat : IAsyncDisposable
         public byte[] Mac { get; } = mac;
         public DateTimeOffset LastHello { get; set; }
         public byte[]? ConsoleMac { get; set; }
+        public string? ConsoleName { get; set; }
         public bool Relay { get; set; }
         public HashSet<ulong> Seen { get; } = [];
 

@@ -134,7 +134,7 @@ public sealed class RoomSession : IAsyncDisposable
 
     public bool LocalConsoleReady => _devices.IsSideReady(DeviceSide.Local);
 
-    public bool RemoteConsoleReady => _devices.IsSideReady(DeviceSide.Remote);
+    public bool RemoteConsoleReady => _devices.IsSideReady(DeviceSide.Remote) || Players.Any(p => p.ConsoleReady);
 
     public IReadOnlyList<IpcPlayer> Players
     {
@@ -148,16 +148,23 @@ public sealed class RoomSession : IAsyncDisposable
             var remote = _devices.Snapshot().Where(d => d.Side == DeviceSide.Remote).ToList();
             return chat.Peers.Select(peer =>
             {
-                var console = peer.ConsoleMac is null ? null : remote.FirstOrDefault(d => d.Mac.ToString() == peer.ConsoleMac);
-                return new IpcPlayer(peer.Name, peer.Connected, console is null ? null : console.Identity ?? "Unknown device",
-                    peer.Connected && console is not null, peer.Relay);
+                if (peer.ConsoleMac is null)
+                {
+                    return new IpcPlayer(peer.Name, peer.Connected, null, false, peer.Relay);
+                }
+
+                var seen = remote.FirstOrDefault(d => d.Mac.ToString() == peer.ConsoleMac);
+                var name = seen?.Identity ?? Chat.ConsoleNameOf(peer.MemberId) ?? "Unknown device";
+                return new IpcPlayer(peer.Name, peer.Connected, name, peer.Connected, peer.Relay);
             }).ToList();
         }
     }
 
-    private (byte[]? ConsoleMac, bool Relay) SelfForRoom()
-        => (_devices.Snapshot().Where(d => d.Side == DeviceSide.Local).OrderByDescending(d => d.LastSeenUtc).FirstOrDefault()?.Mac.ToArray(),
-            _options.Transport.ConnectionKind == "Relay");
+    private (byte[]? ConsoleMac, bool Relay, string? Console) SelfForRoom()
+    {
+        var console = _devices.Snapshot().Where(d => d.Side == DeviceSide.Local).OrderByDescending(d => d.LastSeenUtc).FirstOrDefault();
+        return (console?.Mac.ToArray(), _options.Transport.ConnectionKind == "Relay", console?.Identity);
+    }
 
     public string? ConsoleInternet { get; private set; }
 
