@@ -117,6 +117,7 @@ public sealed class ServiceRequestHandler : IIpcHandler
             Chat: _sessions.Chat,
             WifiNetwork: _sessions.WifiNetwork,
             ConsoleInternet: _sessions.ConsoleInternet,
-            Players: _sessions.Players);
+            Players: _sessions.Players,
+            Progress: _sessions.Progress);
     }
 }

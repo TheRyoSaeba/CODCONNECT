@@ -61,6 +61,17 @@ internal static class Program
         Render(window, output, "long-error-max", 1280, 720);
         Render(window, output, "long-error-small", 900, 620);
         Set(vm, "ErrorText", ""); Notify(vm, "ErrorText");
+        const string step = "Setting up CODCONNECT’s network adapter. This only happens the first time…";
+        Set(vm, "IsBusy", true); Set(vm, "ProgressText", step); Notify(vm, "ProgressText");
+        Render(window, output, "progress-small", 900, 620);
+        var stepText = Descendants<TextBlock>(window).SingleOrDefault(t => t.Text == step && t.IsVisible);
+        var roomHost = (FrameworkElement)window.FindName("ScreenHost");
+        var optionsButton = Descendants<Button>(roomHost).Single(b => Equals(b.Content, "Connection options"));
+        Check(stepText is not null
+              && stepText.TransformToAncestor(roomHost).Transform(new Point()).Y > optionsButton.TransformToAncestor(roomHost).TransformBounds(new Rect(optionsButton.RenderSize)).Bottom
+              && stepText.TransformToAncestor(roomHost).TransformBounds(new Rect(stepText.RenderSize)).Bottom <= roomHost.ActualHeight + 1,
+            "Progress shows below Connection options and stays on screen");
+        Set(vm, "IsBusy", false); Set(vm, "ProgressText", ""); Notify(vm, "IsBusy");
         Click(window, "Connection options");
         Check(Contains(window, "Console port"), "Connection navigation");
         var adapters = Descendants<RadioButton>(window).Where(r => r.GroupName == "Adapters").ToArray();

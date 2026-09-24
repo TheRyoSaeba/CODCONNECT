@@ -47,7 +47,8 @@ public sealed record IpcStatus(
     RoomChatSnapshot? Chat = null,
     IpcWifiNetwork? WifiNetwork = null,
     string? ConsoleInternet = null,
-    IReadOnlyList<IpcPlayer>? Players = null);
+    IReadOnlyList<IpcPlayer>? Players = null,
+    string? Progress = null);
 
 public sealed record IpcPlayer(string Name, bool Connected, string? Console, bool ConsoleReady, bool Relay);
 

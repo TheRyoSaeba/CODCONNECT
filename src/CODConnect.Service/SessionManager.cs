@@ -26,6 +26,9 @@ public sealed class SessionManager : IAsyncDisposable
 
     private readonly SessionJournal? _journal;
     private readonly Wifi.WifiRoomController? _wifi;
+    private volatile string? _progress;
+
+    public string? Progress => _progress;
     private CODConnect.Wifi.WifiHotspot? _wifiNetwork;
 
     public SessionManager(
@@ -337,6 +340,30 @@ public sealed class SessionManager : IAsyncDisposable
         bool wifi,
         CancellationToken cancellationToken)
     {
+        var auto = _transport as AutoRoomTransport;
+        auto?.Progress = Report;
+        try
+        {
+            return await StartReportingAsync(roomCode, run, displayName, adapter, allowInternetAdapter, wifi, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _progress = null;
+            auto?.Progress = null;
+        }
+    }
+
+    private void Report(string step) => _progress = step;
+
+    private async Task<RoomSession> StartReportingAsync(
+        string? roomCode,
+        Func<RoomSessionOptions, CancellationToken, Task<RoomSession>> run,
+        string? displayName,
+        string? adapter,
+        bool allowInternetAdapter,
+        bool wifi,
+        CancellationToken cancellationToken)
+    {
         lock (_lock)
         {
             if (_session is not null)
@@ -348,6 +375,7 @@ public sealed class SessionManager : IAsyncDisposable
         CODConnect.Wifi.WifiHotspot? hotspot = null;
         if (wifi)
         {
+            Report("Starting the console Wi-Fi…");
             if (_wifi is null)
             {
                 throw new InvalidOperationException("Wi-Fi mode is not available in this build.");
@@ -367,6 +395,7 @@ public sealed class SessionManager : IAsyncDisposable
             FriendsConsoleAccess = () => _dev?.FriendsConsoleAccess == true,
             RelayOnly = _dev?.RelayOnly == true,
             Transport = _transport,
+            Progress = Report,
             ConsoleFactory = () => _consoleFactory(adapter, allowInternetAdapter),
             ReleasePcGateway = hotspot is not null && _wifi is { } wifiRoom ? wifiRoom.ReleaseConsoleGatewayAsync : null,
         };

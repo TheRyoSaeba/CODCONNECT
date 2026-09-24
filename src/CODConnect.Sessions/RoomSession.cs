@@ -45,6 +45,8 @@ public sealed record RoomSessionOptions
 
     public Func<Task>? ReleasePcGateway { get; init; }
 
+    public Action<string>? Progress { get; init; }
+
     public TimeSpan PcInternetPatience { get; init; } = TimeSpan.FromSeconds(60);
 
     public Func<bool>? FriendsConsoleAccess { get; init; }
@@ -207,10 +209,13 @@ public sealed class RoomSession : IAsyncDisposable
         }
 
         var rendezvous = new RendezvousClient(options.Rendezvous);
+        options.Progress?.Invoke("Opening your room…");
         var (port, advertise) = await options.Transport.HostAsync(cancellationToken).ConfigureAwait(false);
+        options.Progress?.Invoke("Getting a room code…");
         var created = await rendezvous.CreateRoomAsync(advertise, options.DisplayName, cancellationToken).ConfigureAwait(false)
                       ?? throw new InvalidOperationException("Room creation failed at the rendezvous server.");
 
+        options.Progress?.Invoke("Connecting your console…");
         var hosted = await WireAsync(options, rendezvous, port, created.RoomCode, created.MemberId, created.MemberSecret, created.AdminKey, RoomRole.Host, cancellationToken).ConfigureAwait(false);
         hosted._advertised = advertise;
         return hosted;
@@ -225,12 +230,16 @@ public sealed class RoomSession : IAsyncDisposable
         }
 
         var rendezvous = new RendezvousClient(options.Rendezvous);
+        options.Progress?.Invoke("Finding the room…");
         var joined = await rendezvous.JoinRoomAsync(options.RoomCode, options.DisplayName, endpoint: null, cancellationToken).ConfigureAwait(false)
                      ?? throw new InvalidOperationException($"Could not join room {options.RoomCode} (unknown, expired, or full).");
 
+        options.Progress?.Invoke("Waiting for the host…");
         var peerEndpoints = await WaitForPeerEndpointsAsync(options, rendezvous, joined.MemberId, joined.MemberSecret, cancellationToken).ConfigureAwait(false);
+        options.Progress?.Invoke("Connecting to the host…");
         var port = await options.Transport.JoinAsync(OnlyRelayIfAsked(options, peerEndpoints), cancellationToken).ConfigureAwait(false);
 
+        options.Progress?.Invoke("Connecting your console…");
         return await WireAsync(options, rendezvous, port, joined.RoomCode, joined.MemberId, joined.MemberSecret, adminKey: null, RoomRole.Joiner, cancellationToken).ConfigureAwait(false);
     }
 

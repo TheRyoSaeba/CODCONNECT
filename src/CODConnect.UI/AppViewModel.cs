@@ -132,6 +132,8 @@ public sealed class AppViewModel : INotifyPropertyChanged
 
     public string ErrorText { get; private set; } = string.Empty;
 
+    public string ProgressText { get; private set; } = string.Empty;
+
     public NetworkVisualState Visual { get; private set; } = NetworkVisualState.FromScreen(Screen.Home);
 
     public string? LocalConsoleIdentity { get; private set; }
@@ -241,7 +243,7 @@ public sealed class AppViewModel : INotifyPropertyChanged
 
             if (BackendMode == "service")
             {
-                var response = await _pipe.SendAsync(new IpcRequest("host", DisplayName, Adapter: AdapterSelection, AllowInternetAdapter: _allowInternetAdapter, Mode: WifiMode ? "wifi" : null));
+                var response = await SendWithProgressAsync(new IpcRequest("host", DisplayName, Adapter: AdapterSelection, AllowInternetAdapter: _allowInternetAdapter, Mode: WifiMode ? "wifi" : null));
                 if (!response.Ok)
                 {
                     ErrorText = response.Error ?? "Hosting failed.";
@@ -269,6 +271,53 @@ public sealed class AppViewModel : INotifyPropertyChanged
         }
     }
 
+    private async Task<IpcResponse> SendWithProgressAsync(IpcRequest request)
+    {
+        SetProgress("Getting ready…");
+        using var done = new CancellationTokenSource();
+        var watch = WatchProgressAsync(done.Token);
+        try
+        {
+            return await _pipe.SendAsync(request).ConfigureAwait(true);
+        }
+        finally
+        {
+            done.Cancel();
+            await watch.ConfigureAwait(true);
+            SetProgress(string.Empty);
+        }
+    }
+
+    private async Task WatchProgressAsync(CancellationToken token)
+    {
+        while (!token.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(500, token).ConfigureAwait(true);
+                var progress = (await _pipe.SendAsync(new IpcRequest("status"), token).ConfigureAwait(true)).Status?.Progress;
+                if (!string.IsNullOrEmpty(progress) && !token.IsCancellationRequested)
+                {
+                    SetProgress(progress);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    private void SetProgress(string text)
+    {
+        if (text == ProgressText) return;
+        ProgressText = text;
+        OnPropertyChanged(nameof(ProgressText));
+    }
+
     public async Task JoinRoomAsync(string code)
     {
         if (IsBusy || !ValidateInput(code)) return;
@@ -286,7 +335,7 @@ public sealed class AppViewModel : INotifyPropertyChanged
 
             if (BackendMode == "service")
             {
-                var response = await _pipe.SendAsync(new IpcRequest("join", DisplayName, RoomCode: code, Adapter: AdapterSelection, AllowInternetAdapter: _allowInternetAdapter, Mode: WifiMode ? "wifi" : null));
+                var response = await SendWithProgressAsync(new IpcRequest("join", DisplayName, RoomCode: code, Adapter: AdapterSelection, AllowInternetAdapter: _allowInternetAdapter, Mode: WifiMode ? "wifi" : null));
                 if (!response.Ok)
                 {
                     ErrorText = response.Error ?? "Joining failed.";

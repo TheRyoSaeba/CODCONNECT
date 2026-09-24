@@ -29,6 +29,8 @@ public sealed class AutoRoomTransport : IRoomTransport, IConsoleInternetProvider
 
     public string ConnectionKind => _resolved?.ConnectionKind ?? "Direct";
 
+    public Action<string>? Progress { get; set; }
+
     public async Task<IRoomTransport> ResolveAsync(CancellationToken cancellationToken = default)
         => await ResolveAsync(retryFallback: false, cancellationToken).ConfigureAwait(false);
 
@@ -57,10 +59,20 @@ public sealed class AutoRoomTransport : IRoomTransport, IConsoleInternetProvider
     }
 
     public async Task<(IConsoleNetworkInterface Port, EndpointInfo Advertise)> HostAsync(CancellationToken cancellationToken = default)
-        => await (await ResolveAsync(retryFallback: true, cancellationToken).ConfigureAwait(false)).HostAsync(cancellationToken).ConfigureAwait(false);
+        => await WithProgress(await ResolveAsync(retryFallback: true, cancellationToken).ConfigureAwait(false)).HostAsync(cancellationToken).ConfigureAwait(false);
 
     public async Task<IConsoleNetworkInterface> JoinAsync(IReadOnlyList<EndpointInfo> peers, CancellationToken cancellationToken = default)
-        => await (await ResolveAsync(retryFallback: true, cancellationToken).ConfigureAwait(false)).JoinAsync(peers, cancellationToken).ConfigureAwait(false);
+        => await WithProgress(await ResolveAsync(retryFallback: true, cancellationToken).ConfigureAwait(false)).JoinAsync(peers, cancellationToken).ConfigureAwait(false);
+
+    private IRoomTransport WithProgress(IRoomTransport transport)
+    {
+        if (transport is SoftEtherRoomTransport softEther)
+        {
+            softEther.Progress = Progress;
+        }
+
+        return transport;
+    }
 
     public async Task<IConsoleNetworkInterface> StartConsoleInternetAsync(IPv4Address gateway, IPv4Address mask, CancellationToken cancellationToken = default)
         => await ResolveAsync(cancellationToken).ConfigureAwait(false) is IConsoleInternetProvider provider

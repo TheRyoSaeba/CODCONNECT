@@ -148,7 +148,10 @@ public partial class MainWindow : Window
         if (_internetRow is not null) _internetRow.Text = DescribeConsoleInternet(_vm.ConsoleInternet);
         if (_error is not null)
         {
-            var message = _startupError ?? _vm.ErrorText;
+            var progress = _vm.IsBusy ? _vm.ProgressText : string.Empty;
+            var message = progress.Length > 0 ? progress : _startupError ?? _vm.ErrorText;
+            _error.Foreground = Color(progress.Length > 0 ? "MutedBrush" : "WarnBrush");
+            AutomationProperties.SetLiveSetting(_error, progress.Length > 0 ? AutomationLiveSetting.Polite : AutomationLiveSetting.Assertive);
             _error.Text = message.Length > 110 ? message[..107] + "…" : message;
             _error.ToolTip = new TextBlock { Text = message, MaxWidth = 400, TextWrapping = TextWrapping.Wrap };
             AutomationProperties.SetHelpText(_error, message);
@@ -228,9 +231,9 @@ public partial class MainWindow : Window
         var submit = ActionButton(_joining ? "Join room" : "Create room", () => _joining ? _vm.JoinRoomAsync(NormalizeCode(_joinCode)) : _vm.CreateRoomAsync(), true);
         AutomationProperties.SetAutomationId(submit, "RoomSubmit");
         Space(submit, _compact ? 12 : 20); panel.Children.Add(submit);
-        AddError(panel);
         var options = Button("Connection options", () => Navigate("Connections"));
         Space(options, _compact ? 16 : 24); panel.Children.Add(options);
+        AddError(panel, _compact ? 14 : 20);
         ScreenHost.Content = panel;
     }
 
@@ -266,13 +269,13 @@ public partial class MainWindow : Window
         AddError(panel); ScreenHost.Content = panel;
     }
 
-    private void AddError(Panel panel)
+    private void AddError(Panel panel, double top = 12)
     {
         _error = Text(_vm.ErrorText, size: 12); _error.Foreground = Color("WarnBrush");
         _error.MaxHeight = 60;
         _error.TextTrimming = TextTrimming.WordEllipsis;
         AutomationProperties.SetLiveSetting(_error, AutomationLiveSetting.Assertive);
-        Space(_error, 12); panel.Children.Add(_error);
+        Space(_error, top); panel.Children.Add(_error);
     }
 
     private void AccentRow(Panel panel, string label, string value)

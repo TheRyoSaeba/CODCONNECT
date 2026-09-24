@@ -154,6 +154,7 @@ public sealed class SoftEtherRoomTransport : IRoomTransport, IConsoleInternetPro
     {
         var failures = new List<string>();
         await PrepareAdapterAsync(cancellationToken).ConfigureAwait(false);
+        var attempts = 0;
 
         foreach (var peer in peers)
         {
@@ -167,6 +168,8 @@ public sealed class SoftEtherRoomTransport : IRoomTransport, IConsoleInternetPro
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var port = IsRelayAddress(address) ? RelayPort : peer.Port;
+                Progress?.Invoke(IsRelayAddress(address) ? "Connecting through the relay…"
+                    : attempts++ == 0 ? "Connecting to the host…" : "Trying another way to reach the host…");
                 try
                 {
                     await _client.ConnectAsync(JoinAccount, address, port, peer.Hub, peer.Username, peer.Password, NicName, cancellationToken).ConfigureAwait(false);
@@ -244,6 +247,8 @@ public sealed class SoftEtherRoomTransport : IRoomTransport, IConsoleInternetPro
         }
     }
 
+    public Action<string>? Progress { get; set; }
+
     public static bool IsRoomHubName(string name)
         => name.Length == 11 && name.StartsWith("COD", StringComparison.Ordinal) && name[3..].All(Uri.IsHexDigit);
 
@@ -298,6 +303,11 @@ public sealed class SoftEtherRoomTransport : IRoomTransport, IConsoleInternetPro
         else
         {
             NicName = _options.NicName;
+            if (!_listPcapAdapters().Any(a => MatchesNic(a, NicName)))
+            {
+                Progress?.Invoke("Setting up CODCONNECT’s network adapter. This only happens the first time…");
+            }
+
             await _client.EnsureVirtualAdapterAsync(NicName, cancellationToken).ConfigureAwait(false);
         }
 
