@@ -12,6 +12,8 @@ public sealed record RoomOptions
 
     public IPv4Address PcAddress { get; init; } = new(10, 42, 0, 253);
 
+    public IReadOnlyList<IPv4Address> DnsServers { get; init; } = [new(1, 1, 1, 1), new(8, 8, 8, 8)];
+
     public TimeSpan LeaseDuration { get; init; } = TimeSpan.FromHours(8);
 
     public IPv4Address SubnetMask

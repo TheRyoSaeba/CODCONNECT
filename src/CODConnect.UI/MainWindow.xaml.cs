@@ -487,6 +487,7 @@ public partial class MainWindow : Window
     {
         "Ready" => "Through this PC",
         "Starting" => "Setting up…",
+        "Waiting" => "Waiting for the console",
         "Unavailable" => "Unavailable",
         _ => "Off",
     };

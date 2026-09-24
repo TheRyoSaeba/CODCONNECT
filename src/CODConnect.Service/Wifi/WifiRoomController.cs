@@ -8,7 +8,7 @@ using Microsoft.Win32;
 
 namespace CODConnect.Service.Wifi;
 
-public sealed record WifiUndoRecord(HotspotSettings Original, string RoomSsid, string GuardAddress, int? ForwardingInterfaceIndex = null, string? PcAddress = null, int? PcAddressInterfaceIndex = null);
+public sealed record WifiUndoRecord(HotspotSettings Original, string RoomSsid, string GuardAddress, int? ForwardingInterfaceIndex = null, string? PcAddress = null, int? PcAddressInterfaceIndex = null, string? ConsoleGateway = null);
 
 public sealed class WifiJournal(string? path = null)
 {
@@ -229,7 +229,7 @@ public sealed class WifiRoomController(IWifiHotspotManager hotspot, IDhcpGuard g
     public Task<WifiCapabilityReport> CheckCapabilityAsync(CancellationToken cancellationToken = default)
         => hotspot.CheckCapabilityAsync(cancellationToken);
 
-    public async Task<WifiHotspot> StartAsync(CancellationToken cancellationToken = default, (string Address, string Mask)? pcAddress = null)
+    public async Task<WifiHotspot> StartAsync(CancellationToken cancellationToken = default, (string Address, string Mask)? pcAddress = null, string? consoleGateway = null)
     {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -272,6 +272,12 @@ public sealed class WifiRoomController(IWifiHotspotManager hotspot, IDhcpGuard g
                     record = record with { PcAddress = pc.Address, PcAddressInterfaceIndex = adapterIndex };
                     journal.Write(record);
                     forwarding.AddAddress(adapterIndex, pc.Address, pc.Mask);
+                    if (consoleGateway is not null)
+                    {
+                        record = record with { ConsoleGateway = consoleGateway };
+                        journal.Write(record);
+                        forwarding.AddAddress(adapterIndex, consoleGateway, pc.Mask);
+                    }
                 }
 
                 log?.Invoke($"console Wi-Fi network {room.Ssid} up on {started.AdapterName} ({started.Settings.Band}); Windows DHCP blocked on {address}; Windows routing off on it");
@@ -281,6 +287,24 @@ public sealed class WifiRoomController(IWifiHotspotManager hotspot, IDhcpGuard g
             {
                 await UndoLockedAsync(CancellationToken.None).ConfigureAwait(false);
                 throw;
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task ReleaseConsoleGatewayAsync()
+    {
+        await _gate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (journal.Read() is { ConsoleGateway: { } gateway, PcAddressInterfaceIndex: { } index } record && forwarding is not null)
+            {
+                forwarding.RemoveAddress(index, gateway);
+                journal.Write(record with { ConsoleGateway = null });
+                log?.Invoke($"console gateway {gateway} handed back from the hotspot adapter");
             }
         }
         finally
@@ -313,6 +337,11 @@ public sealed class WifiRoomController(IWifiHotspotManager hotspot, IDhcpGuard g
 
         var ok = true;
         ok &= Step("remove DHCP guard", guard.Remove);
+        if (record is { ConsoleGateway: { } consoleGateway, PcAddressInterfaceIndex: { } gatewayIndex } && forwarding is not null)
+        {
+            ok &= Step("remove the console gateway address", () => forwarding.RemoveAddress(gatewayIndex, consoleGateway));
+        }
+
         if (record is { PcAddress: { } pcAddress, PcAddressInterfaceIndex: { } pcIndex } && forwarding is not null)
         {
             ok &= Step("remove this PC's console-network address", () => forwarding.RemoveAddress(pcIndex, pcAddress));

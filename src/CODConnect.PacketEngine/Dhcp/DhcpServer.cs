@@ -162,7 +162,7 @@ public sealed class DhcpServer
             leaseSeconds: isNak ? 0 : (uint)_options.LeaseDuration.TotalSeconds,
             broadcastAddress: isNak ? null : _broadcastAddress,
             router: isNak ? null : _options.GatewayAddress,
-            dnsServer: isNak ? null : _options.GatewayAddress);
+            dnsServers: isNak ? null : _options.DnsServers);
 
         var destinationMac = isNak || (dhcp.Flags & DhcpPacket.FlagBroadcast) != 0 || dhcp.ClientMac.IsNone
             ? MacAddress.Broadcast

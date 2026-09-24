@@ -51,7 +51,7 @@ public sealed class RoomGuard(RoomOptions room, bool isHost, Func<bool>? friends
         }
 
         return (dhcp.Router.IsNone || dhcp.Router == room.GatewayAddress)
-               && (dhcp.DnsServer.IsNone || dhcp.DnsServer == room.GatewayAddress)
+               && (dhcp.DnsServer.IsNone || dhcp.DnsServer == room.GatewayAddress || room.DnsServers.Contains(dhcp.DnsServer))
                && (dhcp.ServerIdentifier.IsNone || dhcp.ServerIdentifier == room.ServerAddress);
     }
 

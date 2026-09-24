@@ -304,7 +304,7 @@ public class RoomSessionTests
 
         var offer = Assert.Single(offers);
         Assert.Equal(new IPv4Address(10, 42, 0, 254), offer.Router);
-        Assert.Equal(new IPv4Address(10, 42, 0, 254), offer.DnsServer);
+        Assert.Equal(new IPv4Address(1, 1, 1, 1), offer.DnsServer);
         Assert.DoesNotContain(host.Devices, d => d.Mac == gateway.Mac);
 
         await host.DisposeAsync();

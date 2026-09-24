@@ -224,7 +224,7 @@ public class DhcpTests
         var server = CreateServer();
         var offer = ParseReply(Assert.Single(server.HandleFrame(new CapturedFrame(DhcpRequestFrame(MacA, DhcpMessageType.Discover), DateTimeOffset.UtcNow), ServerMac)));
         Assert.Equal(new IPv4Address(10, 42, 0, 254), offer.Router);
-        Assert.Equal(new IPv4Address(10, 42, 0, 254), offer.DnsServer);
+        Assert.Equal(new IPv4Address(1, 1, 1, 1), offer.DnsServer);
 
         var ack = ParseReply(Assert.Single(server.HandleFrame(new CapturedFrame(DhcpRequestFrame(MacA, DhcpMessageType.Request, requested: offer.Yiaddr, serverId: ServerIp), DateTimeOffset.UtcNow), ServerMac)));
         Assert.Equal(DhcpMessageType.Ack, ack.MessageType);

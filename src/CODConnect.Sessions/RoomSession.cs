@@ -43,6 +43,10 @@ public sealed record RoomSessionOptions
 
     public bool ConsoleInternet { get; init; } = true;
 
+    public Func<Task>? ReleasePcGateway { get; init; }
+
+    public TimeSpan PcInternetPatience { get; init; } = TimeSpan.FromSeconds(60);
+
     public Func<bool>? FriendsConsoleAccess { get; init; }
 
     public bool RelayOnly { get; init; }
@@ -602,15 +606,73 @@ public sealed class RoomSession : IAsyncDisposable
         }
 
         var room = options.RoomOptions ?? new RoomOptions();
-        if (options.ConsoleInternet && !room.GatewayAddress.IsNone && options.Transport is IConsoleInternetProvider provider)
+        var provider = options.Transport as IConsoleInternetProvider;
+        if (options.ConsoleInternet && !room.GatewayAddress.IsNone)
         {
-            session.StartConsoleInternet(provider, room.GatewayAddress, room.SubnetMask);
+            if (options.ReleasePcGateway is { } release)
+            {
+                session.WatchPcInternet(room, release, provider);
+            }
+            else if (provider is not null)
+            {
+                session.StartConsoleInternet(provider, room.GatewayAddress, room.SubnetMask);
+            }
         }
 
         return session;
     }
 
-    private void StartConsoleInternet(IConsoleInternetProvider provider, IPv4Address gateway, IPv4Address mask)
+    private void WatchPcInternet(RoomOptions room, Func<Task> releasePcGateway, IConsoleInternetProvider? provider)
+    {
+        ConsoleInternet = "Waiting";
+        var watch = new PcInternetWatch(room.ServerAddress, room.SubnetMask, _options.PcInternetPatience);
+        void Observe(int portId, CapturedFrame frame)
+        {
+            if (portId == _consolePortId)
+            {
+                watch.ObserveConsoleFrame(frame.Buffer.Span);
+            }
+        }
+
+        _switch.FrameAccepted += Observe;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (!watch.Confirmed && !watch.GaveUp)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(500), _lifetime.Token).ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            finally
+            {
+                _switch.FrameAccepted -= Observe;
+            }
+
+            if (watch.Confirmed)
+            {
+                ConsoleInternet = "Ready";
+                StatusChanged?.Invoke("console Internet: through Windows' hotspot sharing on this PC");
+                return;
+            }
+
+            StatusChanged?.Invoke("console Internet: Windows' hotspot sharing did not carry the console's traffic; using CODCONNECT's gateway instead");
+            await Safely(releasePcGateway).ConfigureAwait(false);
+            if (provider is null)
+            {
+                ConsoleInternet = "Unavailable";
+                return;
+            }
+
+            StartConsoleInternet(provider, room.GatewayAddress, room.SubnetMask, announceGateway: true);
+        });
+    }
+
+    private void StartConsoleInternet(IConsoleInternetProvider provider, IPv4Address gateway, IPv4Address mask, bool announceGateway = false)
     {
         ConsoleInternet = "Starting";
         _ = Task.Run(async () =>
@@ -643,6 +705,10 @@ public sealed class RoomSession : IAsyncDisposable
                     _gatewayPort = port;
                     var portId = _engine.AddGatewayPort(port);
                     _devices.IgnorePort(portId);
+                    if (announceGateway)
+                    {
+                        AnnounceGatewayWhenSeen(portId, gateway);
+                    }
                 }
             }
 
@@ -654,6 +720,46 @@ public sealed class RoomSession : IAsyncDisposable
 
             ConsoleInternet = "Ready";
         });
+    }
+
+    private void AnnounceGatewayWhenSeen(int gatewayPortId, IPv4Address gateway)
+    {
+        var announced = 0;
+        void Observe(int portId, CapturedFrame frame)
+        {
+            if (portId != gatewayPortId
+                || !EthernetFrame.TryParse(frame.Buffer.Span, out var ethernet)
+                || !SentBy(ethernet, gateway)
+                || Interlocked.Exchange(ref announced, 1) != 0)
+            {
+                return;
+            }
+
+            _switch.FrameAccepted -= Observe;
+            var announcement = ArpPacket.BuildEthernetFrame(ethernet.Source, gateway, gateway, isReply: false, MacAddress.None);
+            _ = Task.Run(async () =>
+            {
+                for (var i = 0; i < 3 && !_lifetime.IsCancellationRequested; i++)
+                {
+                    await Safely(() => GetPorts().Console.InjectFrameAsync(announcement).AsTask()).ConfigureAwait(false);
+                    await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
+                }
+            });
+        }
+
+        _switch.FrameAccepted += Observe;
+    }
+
+    private static bool SentBy(ParsedFrame ethernet, IPv4Address address)
+    {
+        if (ethernet.EtherType == EthernetFrame.EtherTypeArp)
+        {
+            return ArpPacket.TryParse(ethernet.Payload, out var arp) && arp.SenderIp == address;
+        }
+
+        return ethernet.EtherType == EthernetFrame.EtherTypeIpv4
+               && IPv4Packet.TryParse(ethernet.Payload, out var ip)
+               && ip.Source == address;
     }
 
     private void TryServeDhcp(CapturedFrame frame, List<IConsoleNetworkInterface> ports, NetworkCounters counters)

@@ -22,7 +22,7 @@ public class RoomGuardTests
             clientMac: new MacAddress(0x02, 0, 0, 0, 0, 0x03), hostname: null,
             requestedIp: null, serverIdentifier: serverId,
             subnetMask: new IPv4Address(255, 255, 255, 0), leaseSeconds: 3600, broadcastAddress: null,
-            router: router, dnsServer: dns);
+            router: router, dnsServers: dns is { } d ? [d] : null);
         var udp = UdpPacket.BuildPayload(UdpPacket.PortDhcpServer, UdpPacket.PortDhcpClient, payload, new IPv4Address(10, 42, 0, 1), IPv4Address.Broadcast);
         var ip = IPv4Packet.BuildPayload(new IPv4Address(10, 42, 0, 1), IPv4Address.Broadcast, IPv4Packet.ProtocolUdp, udp);
         return EthernetFrame.Build(MacAddress.Broadcast, Attacker, EthernetFrame.EtherTypeIpv4, ip);
@@ -43,7 +43,8 @@ public class RoomGuardTests
         var guard = new RoomGuard(Room, isHost: false);
         Assert.True(guard.AllowsFromTunnel(DhcpOffer(Room.GatewayAddress, Room.GatewayAddress, Room.ServerAddress)));
         Assert.False(guard.AllowsFromTunnel(DhcpOffer(new IPv4Address(10, 42, 0, 77), Room.GatewayAddress, Room.ServerAddress)));
-        Assert.False(guard.AllowsFromTunnel(DhcpOffer(Room.GatewayAddress, new IPv4Address(8, 8, 8, 8), Room.ServerAddress)));
+        Assert.True(guard.AllowsFromTunnel(DhcpOffer(Room.GatewayAddress, Room.DnsServers[0], Room.ServerAddress)));
+        Assert.False(guard.AllowsFromTunnel(DhcpOffer(Room.GatewayAddress, new IPv4Address(9, 9, 9, 9), Room.ServerAddress)));
         Assert.False(guard.AllowsFromTunnel(DhcpOffer(Room.GatewayAddress, Room.GatewayAddress, new IPv4Address(10, 42, 0, 9))));
     }
 

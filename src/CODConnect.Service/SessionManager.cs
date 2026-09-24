@@ -354,7 +354,7 @@ public sealed class SessionManager : IAsyncDisposable
             }
 
             var room = new CODConnect.Core.Rooms.RoomOptions();
-            hotspot = await _wifi.StartAsync(cancellationToken, (room.PcAddress.ToString(), room.SubnetMask.ToString())).ConfigureAwait(false);
+            hotspot = await _wifi.StartAsync(cancellationToken, (room.PcAddress.ToString(), room.SubnetMask.ToString()), room.GatewayAddress.ToString()).ConfigureAwait(false);
             adapter = hotspot.AdapterName;
             allowInternetAdapter = false;
         }
@@ -368,6 +368,7 @@ public sealed class SessionManager : IAsyncDisposable
             RelayOnly = _dev?.RelayOnly == true,
             Transport = _transport,
             ConsoleFactory = () => _consoleFactory(adapter, allowInternetAdapter),
+            ReleasePcGateway = hotspot is not null && _wifi is { } wifiRoom ? wifiRoom.ReleaseConsoleGatewayAsync : null,
         };
 
         RoomSession session;

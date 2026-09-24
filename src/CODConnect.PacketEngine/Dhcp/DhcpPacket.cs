@@ -160,7 +160,7 @@ public static class DhcpPacket
         uint leaseSeconds,
         IPv4Address? broadcastAddress,
         IPv4Address? router = null,
-        IPv4Address? dnsServer = null)
+        IReadOnlyList<IPv4Address>? dnsServers = null)
     {
         var payload = new List<byte>(300);
 
@@ -229,9 +229,9 @@ public static class DhcpPacket
             AddOption(3, gateway.ToArray());
         }
 
-        if (dnsServer is { IsNone: false } dns)
+        if (dnsServers?.Where(d => !d.IsNone).SelectMany(d => d.ToArray()).ToArray() is { Length: > 0 } dns)
         {
-            AddOption(6, dns.ToArray());
+            AddOption(6, dns);
         }
 
         payload.Add(255);
