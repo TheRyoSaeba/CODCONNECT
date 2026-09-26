@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#D6D6D8">
   <meta property="og:title" content="CODCONNECT">
   <meta property="og:description" content="Six homes. One LAN. Play any game's LAN mode with friends in other houses.">
-  <meta property="og:image" content="assets/app-six-players.png">
+  <meta property="og:image" content="assets/app/players.png">
   <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -78,16 +78,21 @@
       <div class="axes" aria-hidden="true"><i></i><i></i></div>
       <div class="room-copy">
         <h2>At a glance</h2>
-        <ul class="ticks">
-          <li>Up to six players</li>
-          <li>No port forwarding</li>
-          <li>Encrypted end to end</li>
-          <li>Room chat with notifications</li>
-          <li>Consoles keep their Internet</li>
+        <ul class="ticks" id="glance">
+          <li><button type="button" aria-pressed="true" data-shot="0">Up to six players</button></li>
+          <li><button type="button" aria-pressed="false" data-shot="1">Consoles keep their Internet</button></li>
+          <li><button type="button" aria-pressed="false" data-shot="2">Room chat with notifications</button></li>
+          <li><button type="button" aria-pressed="false" data-shot="3">Setup help built in</button></li>
+          <li><button type="button" aria-pressed="false" data-shot="4">Relay backup when direct fails</button></li>
         </ul>
+        <p class="fine">No port forwarding. Encrypted end to end.</p>
       </div>
-      <figure class="shot">
-        <img src="assets/app-six-players.png" width="1180" height="720" loading="lazy" alt="The CODCONNECT app showing a room with six players, their consoles, and the room code">
+      <figure class="shot" id="shots">
+        <img class="shown" src="assets/app/players.png" width="1180" height="720" loading="lazy" alt="A room with six players, their consoles, and the room code">
+        <img src="assets/app/internet.png" width="1180" height="720" loading="lazy" alt="A console on Wi-Fi getting its Internet through this PC">
+        <img src="assets/app/chat.png" width="1180" height="720" loading="lazy" alt="Room chat with messages from friends">
+        <img src="assets/app/setup.png" width="900" height="620" loading="lazy" alt="The setup guide for Ethernet and Wi-Fi">
+        <img src="assets/app/relay.png" width="1180" height="720" loading="lazy" alt="Optional features, including always joining through the relay">
       </figure>
     </section>
 
@@ -159,7 +164,6 @@
   </main>
 
   <nav class="hud-bottom" aria-label="Chapters">
-    <p class="index" aria-hidden="true"><span id="chapterIndex">01</span> / 05</p>
     <ul>
       <li><a href="#lobby" data-nav="0" class="active">Lobby</a></li>
       <li><a href="#setup" data-nav="1">Setup</a></li>

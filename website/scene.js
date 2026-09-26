@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 
 const TAU = Math.PI * 2;
 const PAD_DISTANCE = 4.3;
@@ -21,18 +22,18 @@ const PALETTES = {
 };
 
 const VIEWS = [
-  { dist: 17.5, polar: 60, azimuth: 0, target: [0, 0.8, 0], shift: 0.1, wire: 0, box: 0, opacity: 1, narrow: 1, spin: 1 },
-  { dist: 4, polar: 62, azimuth: 96, target: [-4.1, 0.5, 0.2], shift: 0.2, wire: 0, box: 0, opacity: 1, narrow: 0.35, spin: 0 },
-  { dist: 20, polar: 4, azimuth: 0, target: [-2.4, 0, 0], shift: 0, wire: 1, box: 0, opacity: 0.5, narrow: 0.3, spin: 0 },
-  { dist: 17, polar: 64, azimuth: 30, target: [0, 1.4, 0], shift: 0, wire: 0.4, box: 0, opacity: 0.12, narrow: 0.1, spin: 0 },
-  { dist: 8.6, polar: 72, azimuth: 0, target: [0, 1.15, 0], shift: 0.05, wire: 0, box: 1, opacity: 1, narrow: 1, spin: 0 },
+  { dist: 17.5, polar: 60, azimuth: 0, target: [0, 0.8, 0], shift: 0.1, side: 0, wire: 0, box: 0, opacity: 1, narrow: 1, spin: 1 },
+  { dist: 4, polar: 62, azimuth: 96, target: [-4.1, 0.5, 0.2], shift: 0.2, side: 0.2, wire: 0, box: 0, opacity: 1, narrow: 0.35, spin: 0 },
+  { dist: 20, polar: 4, azimuth: 0, target: [-2.4, 0, 0], shift: 0, side: 0, wire: 1, box: 0, opacity: 0.5, narrow: 0.3, spin: 0 },
+  { dist: 17, polar: 64, azimuth: 30, target: [0, 1.4, 0], shift: 0, side: 0, wire: 0.4, box: 0, opacity: 0.12, narrow: 0.1, spin: 0 },
+  { dist: 8.6, polar: 72, azimuth: 0, target: [0, 1.15, 0], shift: 0.05, side: 0, wire: 0, box: 1, opacity: 1, narrow: 1, spin: 0 },
 ];
 
 const STEP_VIEWS = [
-  { dist: 5, polar: 60, azimuth: 112, target: [-3.9, 0.4, 0.3], shift: 0.2 },
-  { dist: 13, polar: 60, azimuth: -90, target: [-0.6, 0.9, 0], shift: 0.3 },
-  { dist: 4.8, polar: 57, azimuth: 92, target: [-4.1, 0.35, 0.05], shift: 0.2 },
-  { dist: 17, polar: 50, azimuth: 60, target: [0, 0.4, 0], shift: 0.22 },
+  { dist: 6.4, polar: 60, azimuth: 112, target: [-3.9, 0.4, 0.3], shift: 0.02, side: 0.17 },
+  { dist: 13, polar: 58, azimuth: -90, target: [-0.6, 0.9, 0], shift: 0.04, side: 0.17 },
+  { dist: 6.2, polar: 57, azimuth: 92, target: [-4.1, 0.35, 0.05], shift: 0.02, side: 0.17 },
+  { dist: 16.5, polar: 50, azimuth: 60, target: [0, 0.4, 0], shift: 0.04, side: 0.17 },
 ];
 
 function canvasTexture(width, height, draw) {
@@ -226,9 +227,9 @@ export function createScene(canvas, { reduceMotion = false } = {}) {
   sun.shadow.radius = 5;
   const rim = new THREE.DirectionalLight(0x9fdde6, 0.9);
   rim.position.set(-7, 5, -8);
-  const glow = new THREE.PointLight(0x439ddd, 0, 10, 1.6);
-  glow.position.set(0, 1.2, 0);
-  scene.add(hemi, sun, rim, glow);
+  const roomLight = new THREE.PointLight(0x439ddd, 0, 10, 1.6);
+  roomLight.position.set(0, 1.2, 0);
+  scene.add(hemi, sun, rim, roomLight);
 
   const colors = {};
   const mat = {
@@ -290,109 +291,221 @@ export function createScene(canvas, { reduceMotion = false } = {}) {
   ring.castShadow = true;
   lan.add(hub, logo, ring, inner, orbit);
 
+  const glowTexture = canvasTexture(128, 128, (ctx, w) => {
+    const g = ctx.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
+    g.addColorStop(0, "rgba(255,255,255,1)");
+    g.addColorStop(0.35, "rgba(255,255,255,.35)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, w);
+  });
+  const blobTexture = canvasTexture(128, 128, (ctx, w) => {
+    const g = ctx.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
+    g.addColorStop(0, "rgba(0,0,0,.55)");
+    g.addColorStop(0.6, "rgba(0,0,0,.18)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, w);
+  });
+  const grilleTexture = canvasTexture(256, 256, (ctx, w) => {
+    ctx.fillStyle = "#101014";
+    ctx.fillRect(0, 0, w, w);
+    ctx.fillStyle = "#26262d";
+    for (let y = 8; y < w; y += 14) {
+      for (let x = 8 + ((y / 14) % 2) * 7; x < w; x += 14) {
+        ctx.beginPath(); ctx.arc(x, y, 4, 0, TAU); ctx.fill();
+      }
+    }
+  });
+  const handheldScreen = canvasTexture(256, 150, (ctx, w, h) => {
+    const g = ctx.createLinearGradient(0, 0, w, h);
+    g.addColorStop(0, "#1b3a52");
+    g.addColorStop(1, "#0d1b28");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = "rgba(115,217,229,.9)";
+    ctx.font = "600 22px Geist, Segoe UI, sans-serif";
+    ctx.fillText("LAN", 18, 38);
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = `rgba(255,255,255,${0.14 + i * 0.05})`;
+      ctx.fillRect(18, 56 + i * 28, w - 36, 20);
+    }
+  });
+
+  function rbox(w, h, d, r, material) {
+    return new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 4, r), material);
+  }
+
   function lightStrip(geometry) {
     return new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0x5a5a64, toneMapped: false }));
+  }
+
+  function glow(scale) {
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
+    sprite.scale.set(scale[0], scale[1], 1);
+    return sprite;
+  }
+
+  function blob(w, d) {
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map: blobTexture, transparent: true, depthWrite: false, toneMapped: false }));
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.004;
+    return mesh;
+  }
+
+  function flaredWing(side) {
+    const shape = new THREE.Shape();
+    shape.moveTo(-0.25, 0);
+    shape.bezierCurveTo(-0.33, 0.36, -0.4, 0.82, -0.32, 1.18);
+    shape.quadraticCurveTo(0, 1.24, 0.31, 1.2);
+    shape.bezierCurveTo(0.38, 0.84, 0.34, 0.32, 0.24, 0);
+    shape.quadraticCurveTo(0, -0.02, -0.25, 0);
+    const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.026, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.012, bevelSegments: 4, curveSegments: 32 });
+    geometry.rotateY(Math.PI / 2);
+    const position = geometry.attributes.position;
+    for (let i = 0; i < position.count; i++) {
+      const y = position.getY(i);
+      position.setX(i, position.getX(i) + side * 0.07 * Math.pow(y / 1.2, 2));
+    }
+    geometry.computeVertexNormals();
+    return geometry;
   }
 
   function buildConsole(kind) {
     const group = new THREE.Group();
     const lights = [];
+    const glows = [];
+    const addGlow = (sprite, x, y, z) => { sprite.position.set(x, y, z); group.add(sprite); glows.push(sprite); };
     if (kind === "tower") {
-      const core = new THREE.Mesh(extrudeUp(roundedRect(0.16, 0.54, 0.03), 1.0), mat.black);
-      core.position.y = 0.05;
-      const wing = new THREE.Shape();
-      wing.moveTo(-0.24, 0);
-      wing.bezierCurveTo(-0.34, 0.34, -0.42, 0.8, -0.33, 1.16);
-      wing.lineTo(0.3, 1.2);
-      wing.bezierCurveTo(0.38, 0.82, 0.34, 0.3, 0.23, 0);
-      wing.lineTo(-0.24, 0);
-      const wingGeometry = new THREE.ExtrudeGeometry(wing, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 2, curveSegments: 24 });
-      wingGeometry.rotateY(Math.PI / 2);
+      const core = rbox(0.19, 1.04, 0.56, 0.05, mat.black);
+      core.position.y = 0.6;
       for (const side of [-1, 1]) {
-        const panel = new THREE.Mesh(wingGeometry, mat.white);
-        panel.position.set(side * 0.1 - (side > 0 ? 0.03 : 0), 0.04, 0);
-        group.add(panel);
-        const strip = lightStrip(new THREE.BoxGeometry(0.006, 0.92, 0.012));
-        strip.position.set(side * 0.084, 0.56, 0.262);
+        const wing = new THREE.Mesh(flaredWing(side), mat.white);
+        wing.position.set(side * 0.105 - (side > 0 ? 0.026 : 0), 0.06, 0);
+        group.add(wing);
+        const strip = lightStrip(new THREE.BoxGeometry(0.008, 0.96, 0.01));
+        strip.position.set(side * 0.097, 0.6, 0.281);
         group.add(strip);
         lights.push(strip);
+        addGlow(glow([0.12, 1.1]), side * 0.097, 0.6, 0.3);
       }
-      const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.19, 0.04, 36), mat.matte);
-      stand.position.y = 0.02;
-      group.add(core, stand);
+      const port = rbox(0.05, 0.025, 0.01, 0.005, mat.matte);
+      port.position.set(0, 0.28, 0.282);
+      const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.035, 48), mat.matte);
+      stand.position.y = 0.0175;
+      group.add(core, port, stand, blob(0.9, 0.9));
     } else if (kind === "slab") {
       const profile = new THREE.Shape();
       profile.moveTo(-0.5, 0); profile.lineTo(0.5, 0); profile.lineTo(0.6, 0.085); profile.lineTo(-0.4, 0.085); profile.lineTo(-0.5, 0);
-      const slabGeometry = new THREE.ExtrudeGeometry(profile, { depth: 0.66, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.006, bevelSegments: 2 });
+      const slabGeometry = new THREE.ExtrudeGeometry(profile, { depth: 0.66, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.01, bevelSegments: 4 });
       slabGeometry.translate(0, 0, -0.33);
       const lower = new THREE.Mesh(slabGeometry, mat.matte);
-      lower.position.y = 0.04;
+      lower.position.y = 0.05;
       const upper = new THREE.Mesh(slabGeometry, mat.black);
-      upper.position.set(0.04, 0.14, 0);
-      upper.scale.set(0.92, 1, 1);
-      const bar = lightStrip(new THREE.BoxGeometry(0.03, 0.012, 0.64));
-      bar.position.set(0.12, 0.232, 0);
+      upper.position.set(0.045, 0.155, 0);
+      upper.scale.set(0.9, 1, 1);
+      const groove = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.02, 0.62), new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.9 }));
+      groove.position.set(0.03, 0.148, 0);
+      const bar = lightStrip(new THREE.BoxGeometry(0.03, 0.008, 0.64));
+      bar.position.set(0.14, 0.256, 0);
       lights.push(bar);
-      const gap = lightStrip(new THREE.BoxGeometry(1.0, 0.012, 0.02));
-      gap.position.set(0.02, 0.132, 0.33);
-      lights.push(gap);
-      group.add(lower, upper, bar, gap);
+      const edge = lightStrip(new THREE.BoxGeometry(0.95, 0.008, 0.012));
+      edge.position.set(0.03, 0.148, 0.34);
+      lights.push(edge);
+      for (const x of [-0.42, 0.42]) {
+        const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.05, 16), mat.matte);
+        foot.position.set(x, 0.025, 0);
+        group.add(foot);
+      }
+      group.add(lower, upper, groove, bar, edge, blob(1.4, 1.0));
+      addGlow(glow([0.2, 0.9]), 0.14, 0.27, 0);
       group.rotation.y = Math.PI / 2;
     } else if (kind === "cube") {
-      const body = new THREE.Mesh(extrudeUp(roundedRect(0.5, 0.5, 0.06), 1.0), mat.matte);
-      body.position.y = 0.012;
-      const vent = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.03, 48), mat.black);
-      vent.position.y = 1.01;
-      const glowDisc = lightStrip(new THREE.CylinderGeometry(0.15, 0.15, 0.032, 48));
-      glowDisc.position.y = 1.012;
-      lights.push(glowDisc);
-      const dot = lightStrip(new THREE.BoxGeometry(0.04, 0.04, 0.01));
-      dot.position.set(-0.17, 0.9, 0.263);
-      lights.push(dot);
-      group.add(body, vent, glowDisc, dot);
+      const body = rbox(0.5, 1.0, 0.5, 0.06, mat.matte);
+      body.position.y = 0.52;
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.012, 12, 64), mat.black);
+      rim.rotation.x = -Math.PI / 2;
+      rim.position.y = 1.02;
+      const grille = new THREE.Mesh(new THREE.CircleGeometry(0.2, 64), new THREE.MeshStandardMaterial({ map: grilleTexture, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2 }));
+      grille.rotation.x = -Math.PI / 2;
+      grille.position.y = 1.021;
+      const underglow = lightStrip(new THREE.RingGeometry(0.2, 0.225, 64));
+      underglow.rotation.x = -Math.PI / 2;
+      underglow.position.y = 1.022;
+      lights.push(underglow);
+      const power = lightStrip(new THREE.CircleGeometry(0.018, 24));
+      power.position.set(-0.17, 0.9, 0.2505);
+      lights.push(power);
+      const slot = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.012, 0.01), new THREE.MeshStandardMaterial({ color: 0x08080a }));
+      slot.position.set(0.02, 0.62, 0.251);
+      group.add(body, rim, grille, underglow, power, slot, blob(0.9, 0.9));
+      addGlow(glow([0.7, 0.7]), 0, 1.06, 0);
     } else if (kind === "slim") {
-      const body = new THREE.Mesh(extrudeUp(roundedRect(0.72, 0.5, 0.05), 0.17), mat.white);
-      body.position.y = 0.03;
-      const vent = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.012, 48), mat.black);
-      vent.position.set(0.14, 0.215, 0);
-      const light = lightStrip(new THREE.BoxGeometry(0.05, 0.02, 0.01));
-      light.position.set(-0.28, 0.13, 0.262);
+      const body = rbox(0.76, 0.19, 0.52, 0.035, mat.white);
+      body.position.y = 0.105;
+      const vent = new THREE.Mesh(new THREE.CircleGeometry(0.15, 64), new THREE.MeshStandardMaterial({ map: grilleTexture, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2 }));
+      vent.rotation.x = -Math.PI / 2;
+      vent.position.set(0.15, 0.2005, 0);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.01, 10, 64), mat.black);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(0.15, 0.2, 0);
+      const light = lightStrip(new THREE.CircleGeometry(0.014, 20));
+      light.position.set(-0.3, 0.12, 0.261);
       lights.push(light);
-      group.add(body, vent, light);
+      group.add(body, vent, ring, light, blob(1.1, 0.8));
+      addGlow(glow([0.18, 0.18]), -0.3, 0.12, 0.28);
     } else {
-      const dock = new THREE.Mesh(extrudeUp(roundedRect(0.64, 0.16, 0.03), 0.34), mat.matte);
-      dock.position.y = 0.01;
-      const tablet = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.3, 0.035), mat.black);
-      tablet.position.set(0, 0.46, 0.02);
-      const screen = lightStrip(new THREE.PlaneGeometry(0.44, 0.24));
-      screen.position.set(0, 0.46, 0.039);
-      lights.push(screen);
-      const left = new THREE.Mesh(extrudeUp(roundedRect(0.1, 0.035, 0.015), 0.3, 0.01), mat.red);
-      left.position.set(-0.31, 0.31, 0.02);
-      const right = new THREE.Mesh(extrudeUp(roundedRect(0.1, 0.035, 0.015), 0.3, 0.01), mat.blue);
-      right.position.set(0.31, 0.31, 0.02);
-      group.add(dock, tablet, screen, left, right);
+      const dock = rbox(0.66, 0.36, 0.16, 0.04, mat.matte);
+      dock.position.y = 0.19;
+      const tablet = rbox(0.5, 0.3, 0.035, 0.015, mat.black);
+      tablet.position.set(0, 0.47, 0.03);
+      const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.43, 0.24), new THREE.MeshBasicMaterial({ map: handheldScreen, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+      screen.position.set(0, 0.47, 0.049);
+      for (const [side, material] of [[-1, mat.red], [1, mat.blue]]) {
+        const pad = rbox(0.09, 0.3, 0.04, 0.035, material);
+        pad.position.set(side * 0.3, 0.47, 0.03);
+        const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.02, 0.02, 20), mat.black);
+        stick.rotation.x = Math.PI / 2;
+        stick.position.set(side * 0.3, 0.52 + side * -0.05, 0.058);
+        group.add(pad, stick);
+        for (let b = 0; b < 4; b++) {
+          const angle = b * Math.PI / 2;
+          const button = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.01, 12), mat.black);
+          button.rotation.x = Math.PI / 2;
+          button.position.set(side * 0.3 + Math.cos(angle) * 0.022, 0.42 + side * 0.05 + Math.sin(angle) * 0.022, 0.055);
+          group.add(button);
+        }
+      }
+      const led = lightStrip(new THREE.BoxGeometry(0.04, 0.008, 0.01));
+      led.position.set(0.24, 0.06, 0.081);
+      lights.push(led);
+      group.add(dock, tablet, screen, led, blob(1.0, 0.6));
+      addGlow(glow([0.8, 0.5]), 0, 0.47, 0.06);
     }
-    return { group, lights };
+    return { group, lights, glows };
   }
 
   function buildLaptop() {
     const group = new THREE.Group();
-    const base = new THREE.Mesh(extrudeUp(roundedRect(0.5, 0.34, 0.02), 0.02, 0.005), mat.laptop);
+    const base = rbox(0.5, 0.022, 0.34, 0.01, mat.laptop);
+    base.position.y = 0.011;
     const keys = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.16), mat.keys);
     keys.rotation.x = -Math.PI / 2;
-    keys.position.set(0, 0.034, -0.03);
+    keys.position.set(0, 0.0235, -0.035);
+    const pad = new THREE.Mesh(new THREE.PlaneGeometry(0.14, 0.08), new THREE.MeshStandardMaterial({ color: 0x8c8d94, roughness: 0.5, metalness: 0.6, polygonOffset: true, polygonOffsetFactor: -2 }));
+    pad.rotation.x = -Math.PI / 2;
+    pad.position.set(0, 0.0235, 0.1);
     const hinge = new THREE.Group();
-    hinge.position.set(0, 0.025, -0.165);
+    hinge.position.set(0, 0.022, -0.165);
     hinge.rotation.x = -0.22;
-    const lid = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.32, 0.014), mat.laptop);
+    const lid = rbox(0.5, 0.32, 0.012, 0.008, mat.laptop);
     lid.position.set(0, 0.16, 0);
     const texture = screenTexture();
     paintScreen(texture, "idle");
     const display = new THREE.Mesh(new THREE.PlaneGeometry(0.46, 0.28), new THREE.MeshBasicMaterial({ map: texture, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
-    display.position.set(0, 0.16, 0.0095);
+    display.position.set(0, 0.16, 0.0075);
     hinge.add(lid, display);
-    group.add(base, keys, hinge);
+    group.add(base, keys, pad, hinge, blob(0.7, 0.5));
     return { group, texture };
   }
 
@@ -418,7 +531,7 @@ export function createScene(canvas, { reduceMotion = false } = {}) {
     rimMesh.rotation.x = -Math.PI / 2;
     rimMesh.position.y = 0.062;
 
-    const { group: consoleModel, lights } = buildConsole(KINDS[i]);
+    const { group: consoleModel, lights, glows } = buildConsole(KINDS[i]);
     consoleModel.position.set(-0.22, 0.06, 0.05);
     consoleModel.rotation.y += 0.35;
     const laptop = buildLaptop();
@@ -427,7 +540,7 @@ export function createScene(canvas, { reduceMotion = false } = {}) {
     home.add(pad, rimMesh, consoleModel, laptop.group);
     pad.receiveShadow = true;
     for (const group of [consoleModel, laptop.group]) {
-      group.traverse((node) => { if (node.isMesh && node.material.toneMapped !== false) { node.castShadow = true; node.receiveShadow = true; } });
+      group.traverse((node) => { if (node.isMesh && node.material.toneMapped !== false && !node.material.transparent) { node.castShadow = true; node.receiveShadow = true; } });
     }
     lan.add(home);
 
@@ -441,7 +554,7 @@ export function createScene(canvas, { reduceMotion = false } = {}) {
     lan.add(idle, live);
 
     const top = new THREE.Vector3(-0.22, 1.45, 0.05);
-    return { home, rimMaterial, lights, laptop, live, dir, joined: 0, target: 0, top, screenState: "" };
+    return { home, rimMaterial, lights, glows, laptop, live, dir, joined: 0, target: 0, top, focus: 1, screenState: "" };
   });
 
   const you = homes[0];
@@ -451,16 +564,18 @@ export function createScene(canvas, { reduceMotion = false } = {}) {
   code.scale.set(0.001, 0.001, 1);
   lan.add(code);
 
+  const inviteDot = new THREE.SphereGeometry(0.05, 14, 14);
   const invites = homes.slice(1).map((homeInfo) => {
     const end = homeInfo.dir.clone().multiplyScalar(PAD_DISTANCE).setY(1.2);
     const start = new THREE.Vector3(0, 1.6, 0);
     const mid = start.clone().lerp(end, 0.5).setY(3.1);
     const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
-    const geometry = new THREE.TubeGeometry(curve, 60, 0.014, 6, false);
-    const mesh = new THREE.Mesh(geometry, mat.accent);
-    mesh.geometry.setDrawRange(0, 0);
-    lan.add(mesh);
-    return { mesh, total: geometry.index.count };
+    const dots = [0, 1, 2, 3].map(() => {
+      const dot = new THREE.Mesh(inviteDot, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+      lan.add(dot);
+      return dot;
+    });
+    return { curve, dots };
   });
 
   const ripples = [0, 1, 2].map(() => {
@@ -541,7 +656,7 @@ export function createScene(canvas, { reduceMotion = false } = {}) {
     if (i === 1) Object.assign(a, stepView);
     if (j === 1) Object.assign(b, stepView);
     const mix = (x, y) => x + (y - x) * t;
-    const keys = ["dist", "polar", "azimuth", "shift", "wire", "box", "opacity", "narrow", "spin"];
+    const keys = ["dist", "polar", "azimuth", "shift", "side", "wire", "box", "opacity", "narrow", "spin"];
     const view = Object.fromEntries(keys.map((k) => [k, mix(a[k], b[k])]));
     view.target = [0, 1, 2].map((k) => mix(a.target[k], b.target[k]));
     return view;
@@ -561,7 +676,7 @@ export function createScene(canvas, { reduceMotion = false } = {}) {
     const k = reduceMotion ? 1 : 1 - Math.pow(0.002, dt);
 
     const goal = STEP_VIEWS[step];
-    for (const key of ["dist", "polar", "azimuth", "shift"]) stepView[key] += (goal[key] - stepView[key]) * k;
+    for (const key of ["dist", "polar", "azimuth", "shift", "side"]) stepView[key] += (goal[key] - stepView[key]) * k;
     for (let a = 0; a < 3; a++) stepView.target[a] += (goal.target[a] - stepView.target[a]) * k;
 
     smoothPos += (viewPos - smoothPos) * k;
@@ -571,7 +686,10 @@ export function createScene(canvas, { reduceMotion = false } = {}) {
     const polar = view.polar * Math.PI / 180;
     const azimuth = view.azimuth * Math.PI / 180 + spinAngle * view.spin;
     const dist = view.dist * Math.max(1, 1.35 / camera.aspect);
-    camera.setViewOffset(width, height, 0, -view.shift * height, width, height);
+    const narrowScreen = width < 860;
+    const side = narrowScreen ? 0 : view.side;
+    const lift = narrowScreen && smoothPos > 0.5 && smoothPos < 1.5 ? 0.2 : view.shift;
+    camera.setViewOffset(width, height, -side * width, -lift * height, width, height);
     const target = new THREE.Vector3(...view.target);
     camera.position.set(
       target.x + dist * Math.sin(polar) * Math.sin(azimuth),
@@ -588,7 +706,7 @@ export function createScene(canvas, { reduceMotion = false } = {}) {
     const glowing = night || dark;
     mat.ring.color.copy(colors.ringIdle).lerp(colors.lan, readyMix);
     mat.ring.emissive.copy(colors.lan).multiplyScalar(readyMix * (glowing ? 0.55 : 0.22));
-    glow.intensity = readyMix * (glowing ? 14 : 5);
+    roomLight.intensity = readyMix * (glowing ? 14 : 5);
     const liveColor = colors.live.clone().lerp(colors.lan, readyMix);
     mat.live.color.copy(liveColor);
     mat.accent.color.copy(colors.live);
@@ -606,9 +724,18 @@ export function createScene(canvas, { reduceMotion = false } = {}) {
       const wanted = inSetup > 0.5 ? (step === 3 ? 1 : i === 0 && step >= 2 ? 1 : 0) : h.target;
       h.joined += (wanted - h.joined) * (reduceMotion ? 1 : Math.min(1, dt * 4.5));
       h.live.scale.y = Math.max(0.0001, h.joined);
+      const focusGoal = i > 0 && inSetup > 0.5 && (step === 0 || step === 2) ? 0 : 1;
+      h.focus += (focusGoal - h.focus) * (reduceMotion ? 1 : Math.min(1, dt * 5));
+      const shown = h.focus * h.focus * (3 - 2 * h.focus);
+      h.home.scale.setScalar(Math.max(0.001, shown));
+      h.home.visible = shown > 0.01;
       h.rimMaterial.color.copy(colors.padEdge).lerp(liveColor, h.joined);
       h.rimMaterial.opacity = 0.5 + h.joined * 0.5;
       for (const light of h.lights) light.material.color.set(0x5a5a64).lerp(liveColor, h.joined);
+      for (const sprite of h.glows) {
+        sprite.material.color.copy(liveColor);
+        sprite.material.opacity = h.joined * (glowing ? 0.85 : 0.45);
+      }
       let state = h.joined > 0.5 ? "on" : "idle";
       if (i === 0 && inSetup > 0.5) state = step === 0 ? "install" : step === 1 ? "room" : "on";
       if (state !== h.screenState || (state === "install" && now - lastScreenPaint > 80)) {
@@ -630,9 +757,14 @@ export function createScene(canvas, { reduceMotion = false } = {}) {
     code.scale.set(Math.max(0.001, nextCode * 1.5), Math.max(0.001, nextCode * 0.52), 1);
     code.position.y = 1.9 + (reduceMotion ? 0 : Math.sin(now / 700) * 0.06);
     invites.forEach((invite, i) => {
-      const t = codeGoal ? (reduceMotion ? 1 : ((now / 1400) + i * 0.12) % 1.4) : 0;
-      const drawn = Math.min(1, t) * invite.total;
-      invite.mesh.geometry.setDrawRange(0, codeGoal ? Math.floor(drawn / 3) * 3 : 0);
+      invite.dots.forEach((dot, d) => {
+        if (!codeGoal) { dot.material.opacity = 0; return; }
+        const t = reduceMotion ? (d + 1) / 5 : ((now / 1600) + i * 0.17 + d * 0.25) % 1;
+        dot.position.copy(invite.curve.getPoint(t));
+        dot.material.color.copy(colors.live);
+        dot.material.opacity = Math.sin(t * Math.PI) * nextCode;
+        dot.scale.setScalar(0.7 + Math.sin(t * Math.PI) * 0.5);
+      });
     });
 
     const connecting = inSetup > 0.5 && step === 2;

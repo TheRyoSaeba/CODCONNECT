@@ -174,7 +174,9 @@ internal static class Program
         Render(window, output, "ready-all", 1180, 720, allReady);
         Render(window, output, "showcase-ethernet-ready", 1180, 720, allReady, showcase: true);
         Set(vm, "WifiNetwork", new IpcWifiNetwork("CODCONNECT-7F2A", "k7mq4xp2", "2.4 GHz")); Notify(vm, "WifiNetwork");
+        Set(vm, "ConsoleInternet", "Ready"); Notify(vm, "ConsoleInternet");
         Render(window, output, "showcase-wifi-ready", 1180, 720, allReady, showcase: true);
+        Check(Contains(window, "Through this PC"), "Console Internet shows when Windows carries the console");
 
         List<IpcPlayer> squad =
         [

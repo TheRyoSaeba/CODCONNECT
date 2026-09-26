@@ -197,7 +197,6 @@ function setupSteps(scene) {
 function setupChapters(scene, tags, showStep) {
   const sections = [...document.querySelectorAll(".chapter")];
   const links = [...document.querySelectorAll("[data-nav]")];
-  const index = document.getElementById("chapterIndex");
   const setup = document.getElementById("setup");
   let active = -1;
 
@@ -234,7 +233,6 @@ function setupChapters(scene, tags, showStep) {
 
     if (chapter !== active) {
       active = chapter;
-      index.textContent = String(chapter + 1).padStart(2, "0");
       links.forEach((link) => link.classList.toggle("active", Number(link.dataset.nav) === chapter));
       drawTopoSoon();
     }
@@ -260,6 +258,32 @@ let topoTimer = 0;
 function drawTopoSoon() {
   clearTimeout(topoTimer);
   topoTimer = setTimeout(drawTopo, 420);
+}
+
+function setupGlance() {
+  const list = document.getElementById("glance");
+  const buttons = [...list.querySelectorAll("button")];
+  const shots = [...document.querySelectorAll("#shots img")];
+  let current = 0;
+  let timer = 0;
+  const show = (i) => {
+    current = i;
+    buttons.forEach((button, b) => button.setAttribute("aria-pressed", String(b === i)));
+    shots.forEach((shot, s) => shot.classList.toggle("shown", s === i));
+  };
+  const stop = () => { clearInterval(timer); timer = 0; list.classList.remove("cycling"); };
+  buttons.forEach((button, i) => button.addEventListener("click", () => { stop(); show(i); }));
+  if (reduceMotion) return;
+  const start = () => {
+    if (timer || list.dataset.touched) return;
+    list.classList.add("cycling");
+    timer = setInterval(() => show((current + 1) % buttons.length), 5000);
+  };
+  buttons.forEach((button) => button.addEventListener("click", () => { list.dataset.touched = "1"; }));
+  new IntersectionObserver(([entry]) => {
+    if (entry.isIntersecting) start();
+    else stop();
+  }, { threshold: 0.4 }).observe(list);
 }
 
 function animateFaq() {
@@ -296,6 +320,7 @@ setupTheme(scene);
 runLobby(scene, tags);
 const showStep = setupSteps(scene);
 setupChapters(scene, tags, showStep);
+setupGlance();
 animateFaq();
 window.addEventListener("resize", drawTopoSoon);
 document.fonts?.ready.then(() => scene?.setTheme(root.dataset.theme === "night"));
