@@ -10,7 +10,7 @@ const steps = [
   { title: "Install", text: "Install CODCONNECT on a PC near your console." },
   { title: "Make a room", text: "Create a room and send friends the code." },
   { title: "Connect console", text: { wifi: "Join the Wi-Fi network your PC creates.", ethernet: "Plug the console into your PC." } },
-  { title: "Open LAN mode", text: "Your friends’ lobbies show up like they’re next door." },
+  { title: "Open LAN mode", text: "Your friends’ lobbies show up like they’re in the other room." },
 ];
 
 class Wheel {
@@ -201,8 +201,16 @@ function setupChapters(scene, tags, showStep) {
   const setup = document.getElementById("setup");
   let active = -1;
 
+  const bar = document.getElementById("progress");
+  const fill = bar.querySelector("i");
+  const marker = bar.querySelector("b");
+
   const update = () => {
     const vh = window.innerHeight;
+    const scrolled = Math.min(1, window.scrollY / Math.max(1, document.documentElement.scrollHeight - vh));
+    fill.style.transform = `scaleY(${scrolled.toFixed(4)})`;
+    marker.style.top = `${(scrolled * 100).toFixed(2)}%`;
+    bar.classList.toggle("done", scrolled > 0.995);
     const probe = window.scrollY + vh * 0.5;
     let pos = 0;
     let chapter = 0;
