@@ -14,6 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css?v=__BUILD__">
+  <link rel="stylesheet" href="demo.css?v=__BUILD__">
   <script>
     try { const saved = localStorage.getItem("codconnect-theme"); if (saved === "night" || saved === "day") document.documentElement.dataset.theme = saved; } catch {}
   </script>
@@ -79,26 +80,16 @@
       <div class="room-copy">
         <h2>At a glance</h2>
         <ul class="ticks" id="glance">
-          <li><button type="button" aria-pressed="true" data-shot="0">Up to six players</button></li>
-          <li><button type="button" aria-pressed="false" data-shot="1">Consoles keep their Internet</button></li>
-          <li><button type="button" aria-pressed="false" data-shot="2">Room chat with notifications</button></li>
-          <li><button type="button" aria-pressed="false" data-shot="3">Setup help built in</button></li>
-          <li><button type="button" aria-pressed="false" data-shot="4">Relay backup when direct fails</button></li>
+          <li><button type="button" aria-pressed="true">Create a room, share the code</button></li>
+          <li><button type="button" aria-pressed="false">Consoles keep their Internet</button></li>
+          <li><button type="button" aria-pressed="false">Up to six players</button></li>
+          <li><button type="button" aria-pressed="false">Room chat with notifications</button></li>
+          <li><button type="button" aria-pressed="false">Relay backup when direct fails</button></li>
+          <li><button type="button" aria-pressed="false">Setup help built in</button></li>
         </ul>
         <p class="fine">No port forwarding. Encrypted end to end.</p>
       </div>
-      <figure class="shot" id="shots">
-        <div class="lens">
-          <img class="is-current" src="assets/app/players.png" width="1180" height="720" loading="lazy" data-focus="225 158 490 318" data-note="Friends appear as they join" alt="A room with six players, their consoles, and the room code">
-          <img src="assets/app/internet.png" width="1180" height="720" loading="lazy" data-focus="874 440 294 100" data-note="Sign-in and updates keep working" alt="A console on Wi-Fi getting its Internet through this PC">
-          <img src="assets/app/chat.png" width="1180" height="720" loading="lazy" data-focus="92 410 526 96" data-note="A ping when someone writes" alt="Room chat with messages from friends">
-          <img src="assets/app/setup.png" width="900" height="620" loading="lazy" data-focus="90 280 480 238" data-note="Ethernet or Wi-Fi, three steps" alt="The setup guide for Ethernet and Wi-Fi">
-          <img src="assets/app/relay.png" width="1180" height="720" loading="lazy" data-focus="92 228 746 54" data-note="Takes over when a direct link can’t" alt="Optional features, including always joining through the relay">
-          <span class="scan" aria-hidden="true"></span>
-          <div class="reticle" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-          <p class="callout" aria-live="polite"></p>
-        </div>
-      </figure>
+      <figure class="shot demo" id="shots" role="img" aria-label="An animated walkthrough of the CODCONNECT app: making a room, a console getting online, friends joining, room chat, the relay taking over, and setup help."></figure>
     </section>
 
     <section class="chapter faq" id="faq" data-chapter="3">
