@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en" data-theme="day">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CODCONNECT: LAN play between homes</title>
+  <meta name="description" content="CODCONNECT puts up to six consoles in different homes on one LAN, so any game with a LAN mode sees them as if they were in the same room. Free for Windows.">
+  <meta name="theme-color" content="#D6D6D8">
+  <meta property="og:title" content="CODCONNECT">
+  <meta property="og:description" content="Six homes. One LAN. Play any game's LAN mode with friends in other houses.">
+  <meta property="og:image" content="assets/app-six-players.png">
+  <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    try { const saved = localStorage.getItem("codconnect-theme"); if (saved === "night" || saved === "day") document.documentElement.dataset.theme = saved; } catch {}
+  </script>
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <canvas class="topo" id="topo" aria-hidden="true"></canvas>
+  <canvas class="stage3d" id="stage3d" aria-hidden="true"></canvas>
+  <div class="tags" id="tags" aria-hidden="true"></div>
+  <div class="frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+
+  <header class="hud-top">
+    <a class="brand" href="#lobby">CODCONNECT</a>
+    <a class="emblem" href="#lobby" aria-label="Back to top"><img src="assets/mark.svg" alt="" width="26" height="28"></a>
+    <div class="hud-right">
+      <button class="theme" id="theme" type="button" aria-pressed="false">
+        <span>Day</span><span class="switch" aria-hidden="true"><span></span></span><span>Night</span>
+      </button>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="chapter lobby" id="lobby" data-chapter="0">
+      <div class="wheel" id="lobbyWheel" aria-live="polite">
+        <span class="wheel-word" data-wheel>One home.</span>
+      </div>
+      <p class="bracket">LAN play between homes</p>
+      <h1 class="visually-hidden">CODCONNECT puts up to six consoles in different homes on one LAN</h1>
+
+      <div class="lobby-foot">
+        <a class="cta" href="#download">Download for Windows</a>
+        <p class="status"><span id="playerCount">1</span>/6 players <b id="roomState">joining</b></p>
+      </div>
+    </section>
+
+    <section class="chapter setup" id="setup" data-chapter="1">
+      <div class="sticky">
+        <div class="setup-center">
+          <div class="wheel small" id="setupWheel"><span class="wheel-word" data-wheel>Install</span></div>
+          <p class="bracket" id="stepNumber">Step 1 of 4</p>
+          <p class="step-text" id="stepText">Install CODCONNECT on a PC near your console.</p>
+        </div>
+        <div class="chooser" role="group" aria-label="How your console connects">
+          <button type="button" class="chip" data-mode="wifi" aria-pressed="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.8 16a5 5 0 0 1 6.4 0"/><circle cx="12" cy="19.2" r="1.3"/></svg>
+            Wi-Fi
+          </button>
+          <button type="button" class="chip" data-mode="ethernet" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v11H5zM9 14v3h6v-3M12 17v4M8 7v3M11 7v3M14 7v3M17 7v3"/></svg>
+            Ethernet
+          </button>
+        </div>
+      </div>
+      <div class="spacer"></div><div class="spacer"></div><div class="spacer"></div>
+    </section>
+
+    <section class="chapter room" id="room" data-chapter="2">
+      <div class="axes" aria-hidden="true"><i></i><i></i></div>
+      <div class="room-copy">
+        <h2>At a glance</h2>
+        <ul class="ticks">
+          <li>Up to six players</li>
+          <li>No port forwarding</li>
+          <li>Encrypted end to end</li>
+          <li>Room chat with notifications</li>
+          <li>Consoles keep their Internet</li>
+        </ul>
+      </div>
+      <figure class="shot">
+        <img src="assets/app-six-players.png" width="1180" height="720" loading="lazy" alt="The CODCONNECT app showing a room with six players, their consoles, and the room code">
+      </figure>
+    </section>
+
+    <section class="chapter faq" id="faq" data-chapter="3">
+      <h2>Questions</h2>
+      <div class="faq-list">
+        <details>
+          <summary>Which games work?</summary>
+          <p>Any game with a LAN or system link mode. It connects consoles, not a particular game.</p>
+        </details>
+        <details>
+          <summary>Which consoles?</summary>
+          <p>PS4 and PS5 are tested. Other consoles with a LAN mode should work the same way but haven’t been tested yet.</p>
+        </details>
+        <details>
+          <summary>Does every player need a PC?</summary>
+          <p>Yes, a Windows 10 or 11 PC near their console.</p>
+        </details>
+        <details>
+          <summary>Do I need to open ports?</summary>
+          <p>No. Rooms connect directly between homes, and fall back to a relay when they can’t.</p>
+        </details>
+        <details>
+          <summary>Will it lag?</summary>
+          <p>Distance adds delay. Friends in the same region on good connections play smoothly.</p>
+        </details>
+        <details>
+          <summary>Wi-Fi or Ethernet?</summary>
+          <p>Wi-Fi is easiest: your PC creates a network for your console. It needs Wi-Fi that supports Windows Mobile Hotspot. A spare Ethernet port works too.</p>
+        </details>
+        <details>
+          <summary>Does my console keep its Internet?</summary>
+          <p>Yes, through your PC.</p>
+        </details>
+        <details>
+          <summary>Is it safe?</summary>
+          <p>Everything between players is encrypted, and only people with your room code can join.</p>
+        </details>
+        <details>
+          <summary>Why install Npcap separately?</summary>
+          <p>CODCONNECT needs it to reach your console, and its license doesn’t allow bundling it.</p>
+        </details>
+        <details>
+          <summary>Windows warned me about the installer</summary>
+          <p>It isn’t code-signed yet. Choose More info, then Run anyway. The source is on GitHub.</p>
+        </details>
+        <details>
+          <summary>Is it free?</summary>
+          <p>Yes. Free and open source, MIT license.</p>
+        </details>
+      </div>
+    </section>
+
+    <section class="chapter download" id="download" data-chapter="4">
+      <h2 class="download-title">Get CODCONNECT</h2>
+      <div class="download-grid">
+        <ol class="install">
+          <li><a href="https://npcap.com/#download">Install Npcap</a></li>
+          <li><a href="https://github.com/TheRyoSaeba/CODCONNECT/releases/latest">Run the CODCONNECT installer</a></li>
+          <li>Finish the SoftEther setup it opens</li>
+        </ol>
+        <div class="download-action">
+          <a class="cta big" href="https://github.com/TheRyoSaeba/CODCONNECT/releases/latest">Download for Windows</a>
+          <a class="text-link" href="https://github.com/TheRyoSaeba/CODCONNECT">Source on GitHub</a>
+        </div>
+      </div>
+      <p class="legal">MIT license. Not affiliated with Activision, Sony Interactive Entertainment, Microsoft or Nintendo.</p>
+    </section>
+  </main>
+
+  <nav class="hud-bottom" aria-label="Chapters">
+    <p class="index" aria-hidden="true"><span id="chapterIndex">01</span> / 05</p>
+    <ul>
+      <li><a href="#lobby" data-nav="0" class="active">Lobby</a></li>
+      <li><a href="#setup" data-nav="1">Setup</a></li>
+      <li><a href="#room" data-nav="2">Room</a></li>
+      <li><a href="#faq" data-nav="3">Questions</a></li>
+      <li><a href="#download" data-nav="4">Download</a></li>
+    </ul>
+    <p class="signal" aria-hidden="true">Link <span class="bars"><i></i><i></i><i></i><i></i><i></i></span></p>
+  </nav>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
