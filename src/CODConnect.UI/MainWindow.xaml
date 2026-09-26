@@ -32,7 +32,7 @@
       <TextBlock x:Name="PageTitle" Text="Your network" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
       <Border HorizontalAlignment="Right" VerticalAlignment="Center" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="12" Padding="10,4"><TextBlock x:Name="NetworkBadge" Text="Not connected" FontSize="10" Foreground="{StaticResource MutedBrush}"/></Border>
      </Grid>
-     <Grid Grid.Row="1" x:Name="NetworkView"><local:NetworkDiagram x:Name="Diagram" Margin="8,0"/></Grid>
+     <Grid Grid.Row="1" x:Name="NetworkView"><local:NetworkDiagram x:Name="Diagram" Margin="8,0"/><local:UplinkCard x:Name="Uplink"/></Grid>
      <Grid x:Name="DetailView" Grid.Row="1" Margin="28,16,28,0" Visibility="Collapsed"><StackPanel x:Name="DetailContent"/></Grid>
      <TextBlock x:Name="CanvasHint" Grid.Row="2" Visibility="Collapsed" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="28,0" VerticalAlignment="Center"/>
      <Border x:Name="ChatBanner" Grid.Row="1" Grid.RowSpan="2" Width="270" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,22,18" Padding="14,11" CornerRadius="10" Background="#2A2A31" BorderBrush="#3A3A42" BorderThickness="1" Cursor="Hand" Visibility="Collapsed" AutomationProperties.Name="New room chat message" AutomationProperties.LiveSetting="Polite">

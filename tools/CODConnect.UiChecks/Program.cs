@@ -185,7 +185,18 @@ internal static class Program
         Render(window, output, "ready-all", 1180, 720, allReady);
         Render(window, output, "showcase-ethernet-ready", 1180, 720, allReady, showcase: true);
         Set(vm, "WifiNetwork", new IpcWifiNetwork("CODCONNECT-7F2A", "k7mq4xp2", "2.4 GHz")); Notify(vm, "WifiNetwork");
+        var uplink = (UplinkCard)window.FindName("Uplink");
+        Set(vm, "Visual", allReady); Set(vm, "ConsoleInternet", "Waiting"); Notify(vm, "ConsoleInternet");
+        Check(uplink.Stage == 2 && uplink.Visibility == Visibility.Visible && Contains(window, "Connected to this PC"), "A console that connects shows the Internet card");
+        Pump(500); Render(window, output, "uplink-connected", 1180, 720);
         Set(vm, "ConsoleInternet", "Ready"); Notify(vm, "ConsoleInternet");
+        Check(uplink.Stage == 3 && Contains(window, "Online through this PC"), "The card confirms the console is online");
+        Pump(500); Render(window, output, "uplink-online", 1180, 720);
+        typeof(MainWindow).GetMethod("FinishUplink", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [null, EventArgs.Empty]);
+        Pump(500);
+        Check(uplink.Visibility == Visibility.Collapsed && diagram.Opacity > .99 && diagram.Effect is null, "The card steps aside and the diagram comes back");
+        Notify(vm, "ConsoleInternet");
+        Check(uplink.Visibility == Visibility.Collapsed, "The card plays once per room");
         Render(window, output, "showcase-wifi-ready", 1180, 720, allReady with { Internet = "Ready" }, showcase: true);
         Check(Contains(window, "Through this PC"), "Console Internet shows when Windows carries the console");
         Check(diagram.GlowLayerCount == 4, "A console online through this PC lights the Internet link");

@@ -116,7 +116,7 @@ public sealed class NetworkDiagram : FrameworkElement
     }
     private static readonly Brush Accent = Brush("#73D9E5"), Blue = Brush("#65C8FF"), Text = Brush("#EAE9EF"), Muted = Brush("#A1A0AB"), Warn = Brush("#E6B58C");
 
-    private enum Glyph { Console, Pc, Globe }
+    internal enum Glyph { Console, Pc, Globe }
     private static readonly Point Center = new(340, 280);
 
     protected override void OnRender(DrawingContext dc)
@@ -337,7 +337,7 @@ public sealed class NetworkDiagram : FrameworkElement
         _glows.Add(group); dc.DrawDrawing(group);
     }
 
-    private static void GlowStroke(DrawingContext dc, Geometry geometry, double width, bool roundEnds = true)
+    internal static void GlowStroke(DrawingContext dc, Geometry geometry, double width, bool roundEnds = true)
     {
         foreach (var (spread, alpha) in new[] { (20d, .025), (12d, .05), (6d, .11), (0d, .85) })
         {
@@ -363,7 +363,7 @@ public sealed class NetworkDiagram : FrameworkElement
         dc.DrawGeometry(null, pen, Geometry.Parse(data));
     }
 
-    private static void Node(DrawingContext dc, double x, double y, Glyph glyph, bool attached, bool ready, bool lost = false)
+    internal static void Node(DrawingContext dc, double x, double y, Glyph glyph, bool attached, bool ready, bool lost = false)
     {
         var foreground = lost ? Warn : ready ? Blue : attached ? Accent : Muted;
         dc.DrawRoundedRectangle(Brush(lost ? "#2B2520" : ready ? "#223544" : attached ? "#273439" : "#25252B"),

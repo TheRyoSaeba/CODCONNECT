@@ -39,7 +39,21 @@
 .d-page { position: absolute; left: 8px; right: 8px; top: 74px; height: 566px; opacity: 0; visibility: hidden; transition: opacity .3s ease, visibility .3s; }
 .d-page.is-on { opacity: 1; visibility: visible; }
 .d-detail { left: 28px; right: 28px; top: 90px; height: 550px; }
-.d-diagram { width: 100%; height: 100%; overflow: visible; }
+.d-diagram { width: 100%; height: 100%; overflow: visible; transition: opacity .35s ease, filter .35s ease; }
+.d-diagram.dimmed { opacity: .18; filter: blur(3px); }
+.d-uplink { position: absolute; left: 50%; top: 50%; width: 440px; height: 196px; margin: -98px 0 0 -220px; border-radius: 14px; background: #18181C; border: 1px solid #323238; box-shadow: 0 12px 40px rgba(0, 0, 0, .6); opacity: 0; visibility: hidden; transform: translateY(14px); transition: opacity .35s ease, transform .45s cubic-bezier(.2, .8, .3, 1), visibility .35s; }
+.d-uplink.is-on { opacity: 1; visibility: visible; transform: none; }
+.d-uplink svg { position: absolute; left: 0; top: 0; overflow: visible; }
+.d-uplink svg * { transition: fill .5s ease, stroke .5s ease, opacity .5s ease; }
+.d-uplink p { position: absolute; left: 0; right: 0; bottom: 24px; text-align: center; font-size: 12px; color: var(--muted); transition: color .4s ease; }
+.d-uplink[data-stage="3"] p { color: var(--accent); }
+.d-ul-link { stroke: #4E6970; stroke-width: 2; stroke-linecap: round; }
+.d-ul-link1 { stroke: #414149; stroke-dasharray: 6 10; }
+.d-uplink[data-stage="3"] .d-ul-link1 { stroke: #4E6970; stroke-dasharray: none; }
+.d-ul-glow0, .d-uplink[data-stage="3"] .d-ul-glow1 { opacity: .8; animation: d-pulse 2.4s ease-in-out infinite alternate; }
+.d-ul-dot { fill: #fff; opacity: 0; filter: drop-shadow(0 0 4px #73D9E5); }
+.d-uplink[data-stage="3"] .d-ul-dot { opacity: 1; animation: d-ul-move 1.2s linear infinite; }
+@keyframes d-ul-move { from { transform: translateX(0); } to { transform: translateX(82px); } }
 
 .d-diagram * { transition: fill .5s ease, stroke .5s ease, opacity .5s ease; }
 .d-diagram text { font-family: "Segoe UI", Geist, system-ui, sans-serif; }

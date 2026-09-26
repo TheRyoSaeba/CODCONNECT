@@ -54,7 +54,9 @@ function markup() {
     </nav>
     <section class="d-main">
       <header class="d-head"><h4 data-title></h4><span class="d-badge" data-badge></span></header>
-      <div class="d-page" data-page="Room"><svg class="d-diagram" viewBox="0 0 680 530" preserveAspectRatio="xMidYMid meet"></svg></div>
+      <div class="d-page" data-page="Room"><svg class="d-diagram" viewBox="0 0 680 530" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="d-uplink" data-uplink><svg viewBox="0 0 440 196" width="440" height="196"></svg><p data-uplink-status></p></div>
+      </div>
       <div class="d-page d-detail" data-page="Chat">
         <div class="d-thread" data-thread></div>
         <div class="d-compose"><div class="d-box" data-chatinput><span data-text></span><i class="d-caret"></i></div><span class="d-primary" data-send>Send</span></div>
@@ -206,6 +208,17 @@ function buildDuo(root) {
   return { g, linkL, linkR, tunnel, plugL, plugR, glowL, glowR, hubsub, relay, inet, inetLine, inetGlow, inetNode, inetDetail, lc, rc, lp, rp, rcLabel, rpLabel };
 }
 
+function buildUplink(root) {
+  const links = [[106, 194], [246, 334]].map(([from, to], i) => {
+    svg("line", { x1: from, y1: 62, x2: to, y2: 62, class: `d-ul-link d-ul-link${i}` }, root);
+    svg("line", { x1: from, y1: 62, x2: to, y2: 62, class: `d-glow d-ul-glow${i}`, "stroke-width": 2 }, root);
+    return svg("circle", { cx: from, cy: 62, r: 3, class: "d-ul-dot" }, root);
+  });
+  const nodes = [[80, "console"], [220, "pc"], [360, "globe"]].map(([x, glyph]) => node(root, x, 62, glyph));
+  [["Your console", 80], ["This PC", 220], ["Internet", 360]].forEach(([label, x]) => text(root, x, 94, label, "d-t-text", 12));
+  return { links, nodes };
+}
+
 function buildRing(root) {
   const g = svg("g", { class: "d-ring" }, root);
   svg("circle", { cx: 340, cy: 280, r: 150, class: "d-s d-s1" }, g);
@@ -269,19 +282,20 @@ export function createDemo(host, { reduceMotion = false, onChapter = () => {}, o
   const grad = svg("radialGradient", { id: "d-core" }, defs);
   svg("stop", { offset: "0", "stop-color": "rgb(63,163,236)", "stop-opacity": ".2" }, grad);
   svg("stop", { offset: "1", "stop-color": "rgb(63,163,236)", "stop-opacity": "0" }, grad);
-  const blur = svg("filter", { id: "d-blur", x: "-50%", y: "-50%", width: "200%", height: "200%" }, defs);
+  const blur = svg("filter", { id: "d-blur", filterUnits: "userSpaceOnUse", x: -60, y: -60, width: 820, height: 680 }, defs);
   svg("feGaussianBlur", { stdDeviation: "3.2", result: "b" }, blur);
   const merge = svg("feMerge", {}, blur);
   svg("feMergeNode", { in: "b" }, merge);
   svg("feMergeNode", { in: "SourceGraphic" }, merge);
   const duo = buildDuo(diagram);
+  const uplink = buildUplink($("[data-uplink] svg"));
   const ring = buildRing(diagram);
 
   let S;
   const fresh = () => ({
     page: "Room", screen: "home", mode: "ethernet", name: "Player", busy: false, progress: "", code: "", shownCode: "",
     copied: false, localReady: false, remoteReady: false, internet: null, kind: null, tunnel: false, players: [], ever: new Set(),
-    event: null, messages: [], typing: [], unread: 0, banner: null, helpMode: null, selectName: false, typingIn: null, draft: "",
+    uplink: 0, event: null, messages: [], typing: [], unread: 0, banner: null, helpMode: null, selectName: false, typingIn: null, draft: "",
   });
 
   const lostSet = () => new Set(S.players.filter((p) => !p.connected && S.ever.has(p.name)).map((p) => p.name));
@@ -423,6 +437,19 @@ export function createDemo(host, { reduceMotion = false, onChapter = () => {}, o
     });
   }
 
+  function renderUplink() {
+    const card = $("[data-uplink]");
+    card.classList.toggle("is-on", S.uplink > 0);
+    diagram.classList.toggle("dimmed", S.uplink > 0);
+    if (!S.uplink) return;
+    card.dataset.stage = String(S.uplink);
+    const online = S.uplink >= 3;
+    setNode(uplink.nodes[0], true, true);
+    setNode(uplink.nodes[1], true, true);
+    setNode(uplink.nodes[2], true, online);
+    setText($("[data-uplink-status]"), online ? "Online through this PC" : "Connected to this PC");
+  }
+
   function renderChat() {
     const thread = $("[data-thread]");
     const signature = JSON.stringify([S.messages, S.typing]);
@@ -474,6 +501,7 @@ export function createDemo(host, { reduceMotion = false, onChapter = () => {}, o
     renderSide();
     renderChrome();
     renderDiagram();
+    renderUplink();
     renderChat();
     renderHelp();
     const code = $("[data-code]");
@@ -532,14 +560,16 @@ export function createDemo(host, { reduceMotion = false, onChapter = () => {}, o
       },
     },
     {
-      length: 5200,
-      finish() { S.localReady = true; S.internet = "Ready"; },
+      length: 8200,
+      finish() { S.localReady = true; S.internet = "Ready"; S.uplink = 0; },
       async play(run) {
         await run.wait(900);
-        set({ localReady: true });
-        await run.wait(1800);
-        set({ internet: "Ready" });
-        await run.wait(2300);
+        set({ localReady: true, uplink: 2 });
+        await run.wait(1900);
+        set({ internet: "Ready", uplink: 3 });
+        await run.wait(3500);
+        set({ uplink: 0 });
+        await run.wait(1500);
       },
     },
     {

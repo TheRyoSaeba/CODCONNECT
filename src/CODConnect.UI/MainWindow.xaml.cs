@@ -31,6 +31,9 @@ public partial class MainWindow : Window
     private string _submitLabel = "";
     private string _revealedCode = "";
     private DispatcherTimer? _codeScramble;
+    private DispatcherTimer? _uplinkTimer;
+    private bool _uplinkDone;
+    private double _diagramDim = 1;
 
     internal bool? NpcapMissing { get; set; }
 
@@ -154,6 +157,7 @@ public partial class MainWindow : Window
         if (_connectionRow is not null) _connectionRow.Text = RoomBadge.Connection(_vm.ConnectionKind, _vm.Screen == Screen.Connected, _vm.Players);
         if (_internetRow is not null) _internetRow.Text = NetworkDiagram.DescribeInternet(_vm.ConsoleInternet ?? "");
         RefreshSubmit();
+        RefreshUplink();
         if (_error is not null)
         {
             var progress = _vm.IsBusy ? _vm.ProgressText : string.Empty;
@@ -524,6 +528,51 @@ public partial class MainWindow : Window
             target.Text = code;
         };
         _codeScramble.Start();
+    }
+
+    private void RefreshUplink()
+    {
+        var internet = _vm.ConsoleInternet;
+        if (_vm.IsHome || internet is null or "Unavailable")
+        {
+            _uplinkDone = _uplinkDone && !_vm.IsHome;
+            _uplinkTimer?.Stop();
+            SetUplink(0);
+            return;
+        }
+
+        if (_uplinkDone) return;
+        if (internet == "Ready")
+        {
+            if (Uplink.Stage == 3) return;
+            SetUplink(3);
+            _uplinkTimer ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(3.5) };
+            _uplinkTimer.Tick -= FinishUplink;
+            _uplinkTimer.Tick += FinishUplink;
+            _uplinkTimer.Start();
+            return;
+        }
+
+        SetUplink(_vm.Visual.LocalReady ? 2 : 0);
+    }
+
+    private void FinishUplink(object? sender, EventArgs e)
+    {
+        _uplinkTimer?.Stop();
+        _uplinkDone = true;
+        SetUplink(0);
+    }
+
+    private void SetUplink(int stage)
+    {
+        var motion = MotionAllowed;
+        if (stage == 0) Uplink.Hide(motion); else Uplink.Show(stage, motion);
+        var dim = stage == 0 ? 1 : .18;
+        if (dim == _diagramDim) return;
+        _diagramDim = dim;
+        Diagram.Effect = stage == 0 ? null : new System.Windows.Media.Effects.BlurEffect { Radius = 3 };
+        if (motion) Diagram.BeginAnimation(OpacityProperty, new DoubleAnimation(dim, TimeSpan.FromMilliseconds(350)));
+        else { Diagram.BeginAnimation(OpacityProperty, null); Diagram.Opacity = dim; }
     }
 
     private void RefreshSubmit()
