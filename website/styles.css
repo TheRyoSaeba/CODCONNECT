@@ -189,7 +189,7 @@ h2 { margin: 0; font-weight: 500; letter-spacing: -0.035em; font-size: clamp(2.4
 .ticks button:hover { color: var(--ink); }
 .ticks button[aria-pressed="true"] { color: var(--ink); padding-left: 32px; }
 .ticks button[aria-pressed="true"]::before { background: var(--accent); }
-.ticks.cycling button[aria-pressed="true"]::after { animation: glance-timer 5s linear forwards; }
+.ticks.cycling button[aria-pressed="true"]::after { animation: glance-timer var(--glance-time, 6.5s) linear forwards; }
 @keyframes glance-timer { to { transform: scaleX(1); } }
 .room .fine { margin: 18px 0 0; color: var(--muted); font-size: .9375rem; }
 .axes { position: absolute; inset: 0; pointer-events: none; }
@@ -197,9 +197,36 @@ h2 { margin: 0; font-weight: 500; letter-spacing: -0.035em; font-size: clamp(2.4
 .axes i:first-child { left: 0; right: 0; top: 50%; height: 1px; }
 .axes i:last-child { top: 0; bottom: 0; left: 38%; width: 1px; }
 .shot { position: relative; margin: 0; }
-.shot { aspect-ratio: 1180 / 720; border-radius: 12px; background: #1B1B20; border: 1px solid var(--line); box-shadow: 0 40px 90px -40px rgba(0, 0, 0, .7); }
-.shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; border-radius: 12px; opacity: 0; transform: scale(.985); transition: opacity .45s ease, transform .6s cubic-bezier(.3, .7, .2, 1); }
-.shot img.shown { opacity: 1; transform: none; }
+.shot {
+  aspect-ratio: 1180 / 720; border-radius: 12px; background: #1B1B20; border: 1px solid var(--line); box-shadow: 0 40px 90px -40px rgba(0, 0, 0, .7);
+  transform: perspective(1600px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+}
+.lens { position: absolute; inset: 0; overflow: hidden; border-radius: 12px; }
+.lens::after {
+  content: ""; position: absolute; inset: -20%; pointer-events: none; z-index: 5;
+  background: linear-gradient(115deg, transparent 42%, rgba(255, 255, 255, .055) 50%, transparent 58%);
+  transform: translateX(var(--shine, 0%));
+}
+.lens img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transform-origin: 0 0; opacity: 0; }
+.lens img.is-current { opacity: 1; z-index: 2; }
+.lens img.is-leaving { opacity: 1; z-index: 1; }
+.scan { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; margin-left: -1px; z-index: 3; opacity: 0; background: #73D9E5; box-shadow: 0 0 18px 4px rgba(115, 217, 229, .55); pointer-events: none; }
+.reticle { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 3; opacity: 0; pointer-events: none; }
+.reticle i { position: absolute; width: 16px; height: 16px; border: 2px solid #73D9E5; }
+.reticle i:nth-child(1) { left: -6px; top: -6px; border-right: 0; border-bottom: 0; --lx: -5px; --ly: -5px; }
+.reticle i:nth-child(2) { right: -6px; top: -6px; border-left: 0; border-bottom: 0; --lx: 5px; --ly: -5px; }
+.reticle i:nth-child(3) { left: -6px; bottom: -6px; border-right: 0; border-top: 0; --lx: -5px; --ly: 5px; }
+.reticle i:nth-child(4) { right: -6px; bottom: -6px; border-left: 0; border-top: 0; --lx: 5px; --ly: 5px; }
+.reticle.locked i { animation: lock .5s cubic-bezier(.3, .7, .2, 1); }
+@keyframes lock { 40% { transform: translate(var(--lx), var(--ly)); border-color: #fff; } }
+.callout {
+  position: absolute; left: 0; top: 0; z-index: 4; margin: 0; display: inline-flex; align-items: center; gap: 10px; white-space: nowrap;
+  padding: 9px 14px 9px 12px; border-radius: 8px; background: rgba(12, 12, 15, .88); border: 1px solid rgba(115, 217, 229, .45);
+  color: #EDEDF0; font-size: clamp(.8125rem, .7rem + .35vw, 1rem); font-weight: 600;
+  clip-path: inset(0 100% 0 0 round 8px); transition: clip-path .55s cubic-bezier(.7, 0, .2, 1);
+}
+.callout::before { content: ""; width: 7px; height: 7px; background: #73D9E5; transform: rotate(45deg); flex: none; }
+.callout.shown { clip-path: inset(0 0 0 0 round 8px); }
 .shot::before, .shot::after { content: ""; position: absolute; width: 24px; height: 24px; border: 1.5px solid var(--accent); }
 .shot::before { left: -14px; top: -14px; border-right: 0; border-bottom: 0; }
 .shot::after { right: -14px; bottom: -14px; border-left: 0; border-top: 0; }

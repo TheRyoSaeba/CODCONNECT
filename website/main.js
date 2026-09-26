@@ -261,29 +261,184 @@ function drawTopoSoon() {
 }
 
 function setupGlance() {
+  const DURATION = 6500;
+  const EASE = "cubic-bezier(.75, 0, .2, 1)";
   const list = document.getElementById("glance");
   const buttons = [...list.querySelectorAll("button")];
-  const shots = [...document.querySelectorAll("#shots img")];
-  let current = 0;
+  const figure = document.getElementById("shots");
+  const lens = figure.querySelector(".lens");
+  const shots = [...lens.querySelectorAll("img")];
+  const scan = lens.querySelector(".scan");
+  const reticle = lens.querySelector(".reticle");
+  const callout = lens.querySelector(".callout");
+  list.style.setProperty("--glance-time", `${DURATION}ms`);
+
+  let current = -1;
   let timer = 0;
+  let timeouts = [];
+  let running = [];
+
+  const clamp = (value, low, high) => low > high ? (low + high) / 2 : Math.min(high, Math.max(low, value));
+
+  const framing = (img, boost = 1) => {
+    const w = lens.clientWidth, h = lens.clientHeight;
+    const nw = Number(img.getAttribute("width")), nh = Number(img.getAttribute("height"));
+    const k = Math.min(w / nw, h / nh);
+    const dw = nw * k, dh = nh * k, dx = (w - dw) / 2, dy = (h - dh) / 2;
+    const [x, y, rw, rh] = img.dataset.focus.split(" ").map(Number);
+    const fx = dx + x * k, fy = dy + y * k, fw = rw * k, fh = rh * k;
+    const s = Math.max(1, Math.min(w * 0.8 / fw, h * 0.56 / fh, 2.4)) * boost;
+    const tx = clamp(w * 0.5 - (fx + fw / 2) * s, w - (dx + dw) * s, -dx * s);
+    const ty = clamp(h * 0.42 - (fy + fh / 2) * s, h - (dy + dh) * s, -dy * s);
+    return {
+      transform: `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${s.toFixed(4)})`,
+      box: { left: `${(tx + fx * s - 12).toFixed(1)}px`, top: `${(ty + fy * s - 10).toFixed(1)}px`, width: `${(fw * s + 24).toFixed(1)}px`, height: `${(fh * s + 20).toFixed(1)}px` },
+    };
+  };
+
+  const frameBox = () => ({ left: "10px", top: "10px", width: `${lens.clientWidth - 20}px`, height: `${lens.clientHeight - 20}px` });
+  const shade = (alpha) => `0 0 0 100vmax rgba(9, 9, 12, ${alpha})`;
+
+  const placeCallout = (box) => {
+    const left = parseFloat(box.left), top = parseFloat(box.top), height = parseFloat(box.height);
+    const w = lens.clientWidth, h = lens.clientHeight;
+    const below = top + height + 16;
+    const y = below + callout.offsetHeight < h - 8 ? below : Math.max(8, top - callout.offsetHeight - 16);
+    callout.style.left = `${clamp(left, 8, w - callout.offsetWidth - 8)}px`;
+    callout.style.top = `${y}px`;
+  };
+
+  const halt = () => {
+    timeouts.forEach(clearTimeout);
+    timeouts = [];
+    for (const animation of running) {
+      try { animation.commitStyles(); } catch {}
+      animation.cancel();
+    }
+    running = [];
+  };
+
+  const settle = () => {
+    if (current < 0) return;
+    halt();
+    const img = shots[current];
+    const end = framing(img, 1.04);
+    img.style.transform = end.transform;
+    img.style.clipPath = "";
+    Object.assign(reticle.style, end.box, { opacity: 1, boxShadow: shade(0.5) });
+    placeCallout(end.box);
+    callout.classList.add("shown");
+  };
+
   const show = (i) => {
+    const previous = current >= 0 ? shots[current] : null;
+    const next = shots[i];
+    halt();
+    shots.forEach((img) => { img.style.clipPath = ""; });
+    scan.style.opacity = "";
+    scan.style.transform = "";
     current = i;
     buttons.forEach((button, b) => button.setAttribute("aria-pressed", String(b === i)));
-    shots.forEach((shot, s) => shot.classList.toggle("shown", s === i));
+    shots.forEach((img) => img.classList.remove("is-current", "is-leaving"));
+    if (previous && previous !== next) previous.classList.add("is-leaving");
+    next.classList.add("is-current");
+    callout.classList.remove("shown");
+    callout.textContent = next.dataset.note;
+
+    if (reduceMotion) { settle(); return; }
+
+    const focus = framing(next);
+    const drift = framing(next, 1.04);
+    const start = { left: `${reticle.offsetLeft}px`, top: `${reticle.offsetTop}px`, width: `${reticle.offsetWidth}px`, height: `${reticle.offsetHeight}px` };
+    const startOpacity = Number(getComputedStyle(reticle).opacity);
+    const startShade = previous ? 0.5 : 0;
+    const at = (offset, box, extra) => ({ ...box, ...extra, offset });
+    const full = "translate(0px, 0px) scale(1)";
+
+    next.style.transform = full;
+    next.style.clipPath = "";
+    if (previous && previous !== next) {
+      running.push(next.animate([{ clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)" }], { duration: 850, easing: EASE }));
+      running.push(scan.animate([
+        { transform: "translateX(0px)", opacity: 1 },
+        { transform: `translateX(${lens.clientWidth}px)`, opacity: 1, offset: 0.92 },
+        { transform: `translateX(${lens.clientWidth}px)`, opacity: 0 },
+      ], { duration: 850, easing: EASE }));
+    } else {
+      running.push(next.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500 }));
+    }
+
+    running.push(next.animate([
+      { transform: full, offset: 0 },
+      { transform: full, offset: 0.14, easing: EASE },
+      { transform: focus.transform, offset: 0.38 },
+      { transform: drift.transform, offset: 1 },
+    ], { duration: DURATION, fill: "forwards" }));
+
+    running.push(reticle.animate([
+      at(0, start, { opacity: startOpacity, boxShadow: shade(startShade), easing: EASE }),
+      at(0.12, frameBox(), { opacity: 1, boxShadow: shade(0) }),
+      at(0.14, frameBox(), { opacity: 1, boxShadow: shade(0), easing: EASE }),
+      at(0.38, focus.box, { opacity: 1, boxShadow: shade(0.5) }),
+      at(1, drift.box, { opacity: 1, boxShadow: shade(0.5) }),
+    ], { duration: DURATION, fill: "forwards" }));
+
+    timeouts.push(setTimeout(() => {
+      reticle.classList.remove("locked");
+      void reticle.offsetWidth;
+      reticle.classList.add("locked");
+      placeCallout(drift.box);
+      callout.classList.add("shown");
+    }, DURATION * 0.38));
   };
+
   const stop = () => { clearInterval(timer); timer = 0; list.classList.remove("cycling"); };
-  buttons.forEach((button, i) => button.addEventListener("click", () => { stop(); show(i); }));
-  if (reduceMotion) return;
   const start = () => {
-    if (timer || list.dataset.touched) return;
+    if (timer || list.dataset.touched || reduceMotion) return;
     list.classList.add("cycling");
-    timer = setInterval(() => show((current + 1) % buttons.length), 5000);
+    if (current < 0) show(0);
+    timer = setInterval(() => show((current + 1) % shots.length), DURATION);
   };
-  buttons.forEach((button) => button.addEventListener("click", () => { list.dataset.touched = "1"; }));
+
+  buttons.forEach((button, i) => button.addEventListener("click", () => {
+    list.dataset.touched = "1";
+    stop();
+    show(i);
+  }));
+
   new IntersectionObserver(([entry]) => {
-    if (entry.isIntersecting) start();
-    else stop();
-  }, { threshold: 0.4 }).observe(list);
+    if (entry.isIntersecting) {
+      if (current < 0 && (reduceMotion || list.dataset.touched)) show(0);
+      start();
+    } else stop();
+  }, { threshold: 0.4 }).observe(figure);
+
+  let resizeTimer = 0;
+  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(settle, 150); });
+
+  if (reduceMotion || !window.matchMedia("(pointer: fine)").matches) return;
+  const room = document.getElementById("room");
+  const tilt = { x: 0, y: 0, tx: 0, ty: 0, active: false, running: false };
+  const frame = () => {
+    tilt.x += (tilt.tx - tilt.x) * 0.08;
+    tilt.y += (tilt.ty - tilt.y) * 0.08;
+    figure.style.setProperty("--tilt-x", `${tilt.x.toFixed(3)}deg`);
+    figure.style.setProperty("--tilt-y", `${tilt.y.toFixed(3)}deg`);
+    lens.style.setProperty("--shine", `${(tilt.y * 6).toFixed(2)}%`);
+    if (tilt.active || Math.abs(tilt.x) + Math.abs(tilt.y) > 0.01) requestAnimationFrame(frame);
+    else tilt.running = false;
+  };
+  const kick = () => { if (!tilt.running) { tilt.running = true; requestAnimationFrame(frame); } };
+  room.addEventListener("pointermove", (event) => {
+    const rect = figure.getBoundingClientRect();
+    const nx = Math.max(-1, Math.min(1, (event.clientX - (rect.left + rect.width / 2)) / (rect.width / 2)));
+    const ny = Math.max(-1, Math.min(1, (event.clientY - (rect.top + rect.height / 2)) / (rect.height / 2)));
+    tilt.tx = -ny * 3.5;
+    tilt.ty = nx * 5;
+    tilt.active = true;
+    kick();
+  });
+  room.addEventListener("pointerleave", () => { tilt.tx = 0; tilt.ty = 0; tilt.active = false; kick(); });
 }
 
 function animateFaq() {
