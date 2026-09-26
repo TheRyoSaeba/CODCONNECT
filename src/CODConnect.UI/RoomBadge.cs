@@ -4,11 +4,16 @@ namespace CODConnect.UI;
 
 public static class RoomBadge
 {
-    public static string Describe(Screen screen, IReadOnlyList<IpcPlayer> players, string? recentEvent = null)
+    public static string Describe(Screen screen, IReadOnlyList<IpcPlayer> players, string? recentEvent = null, IReadOnlyCollection<string>? lost = null)
     {
         if (screen == Screen.Home)
         {
             return "Not connected";
+        }
+
+        if (players.FirstOrDefault(p => lost?.Contains(p.Name) == true) is { } reconnecting)
+        {
+            return $"Reconnecting {Short(reconnecting.Name)}…";
         }
 
         if (recentEvent is not null)
@@ -33,10 +38,18 @@ public static class RoomBadge
         };
     }
 
-    public static string PlayerDetail(IpcPlayer player)
+    public static string PlayerDetail(IpcPlayer player, bool lost = false)
     {
+        if (lost) return "Reconnecting";
         var state = !player.Connected ? "Connecting" : player.Console ?? "No console yet";
         return player.Relay && player.Connected ? state + ", via relay" : state;
+    }
+
+    public static string Connection(string? kind, bool connected, IReadOnlyList<IpcPlayer> players)
+    {
+        var shown = kind ?? (connected ? "Direct" : "Pending");
+        var relayed = players.Count(p => p.Connected && p.Relay);
+        return shown == "Direct" && relayed > 0 ? $"Direct, {relayed} via relay" : shown;
     }
 
     public static string FriendsSummary(IReadOnlyList<IpcPlayer> players)

@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 
 namespace CODConnect.UI;
@@ -26,6 +27,10 @@ public partial class MainWindow : Window
     private bool _troubleshooting;
     private TextBlock? _status, _counters, _roomCode, _error, _engine, _localConsoleRow, _remoteConsoleRow, _connectionRow, _internetRow;
     private StackPanel? _playerRows;
+    private Button? _submit;
+    private string _submitLabel = "";
+    private string _revealedCode = "";
+    private DispatcherTimer? _codeScramble;
 
     internal bool? NpcapMissing { get; set; }
 
@@ -88,6 +93,7 @@ public partial class MainWindow : Window
             _vm.IncomingChat += message => Dispatcher.BeginInvoke(() => OnIncomingChat(message));
             ChatToasts.Activated = () => Dispatcher.BeginInvoke(OpenChatFromNotification);
         }
+        ChatBanner.MouseLeftButtonUp += (_, _) => OpenChatFromNotification();
         _initialized = !initializeBackend;
         Navigate("Room");
         RefreshScreen();
@@ -135,17 +141,19 @@ public partial class MainWindow : Window
     {
         foreach (var action in _actions) action.IsEnabled = _initialized && !_vm.IsBusy;
         foreach (var choice in DetailContent.Children.OfType<RadioButton>()) choice.IsEnabled = _vm.IsHome && !_vm.IsBusy;
-        NetworkBadge.Text = RoomBadge.Describe(_vm.Screen, _vm.Players, _vm.RoomEvent);
-        NetworkBadge.Foreground = Color(_vm.Screen == Screen.Connected && (_vm.Players.Count == 0 || _vm.Players.Any(p => p.Connected)) ? "AccentBrush" : "MutedBrush");
+        NetworkBadge.Text = RoomBadge.Describe(_vm.Screen, _vm.Players, _vm.RoomEvent, _vm.ReconnectingPlayers);
+        NetworkBadge.Foreground = Color(_vm.ReconnectingPlayers.Count > 0 && !_vm.IsHome ? "WarnBrush"
+            : _vm.Screen == Screen.Connected && (_vm.Players.Count == 0 || _vm.Players.Any(p => p.Connected)) ? "AccentBrush" : "MutedBrush");
         if (_engine is not null)
             _engine.Text = !_initialized ? "Starting…" : _vm.BackendMode == "service" ? "Background service" : "Desktop app";
         Diagram.State = _vm.Visual;
-        if (_roomCode is not null) _roomCode.Text = _vm.RoomCode;
+        if (_roomCode is not null) RevealRoomCode();
         if (_localConsoleRow is not null) _localConsoleRow.Text = _vm.LocalConsoleIdentity ?? "Not identified";
         if (_remoteConsoleRow is not null) _remoteConsoleRow.Text = _vm.RemoteConsoleIdentity ?? "Not identified";
         RefreshPlayerRows();
-        if (_connectionRow is not null) _connectionRow.Text = _vm.ConnectionKind ?? (_vm.Screen == Screen.Connected ? "Direct" : "Pending");
-        if (_internetRow is not null) _internetRow.Text = DescribeConsoleInternet(_vm.ConsoleInternet);
+        if (_connectionRow is not null) _connectionRow.Text = RoomBadge.Connection(_vm.ConnectionKind, _vm.Screen == Screen.Connected, _vm.Players);
+        if (_internetRow is not null) _internetRow.Text = NetworkDiagram.DescribeInternet(_vm.ConsoleInternet ?? "");
+        RefreshSubmit();
         if (_error is not null)
         {
             var progress = _vm.IsBusy ? _vm.ProgressText : string.Empty;
@@ -165,7 +173,8 @@ public partial class MainWindow : Window
     private void RefreshScreen()
     {
         _shownScreen = _vm.Screen;
-        _actions.Clear(); _roomCode = null; _localConsoleRow = null; _remoteConsoleRow = null; _connectionRow = null; _internetRow = null; _playerRows = null;
+        if (_vm.IsHome) _revealedCode = "";
+        _actions.Clear(); _roomCode = null; _submit = null; _localConsoleRow = null; _remoteConsoleRow = null; _connectionRow = null; _internetRow = null; _playerRows = null;
         if (_vm.Screen == Screen.Home) ShowHome(); else ShowSession();
         RefreshChrome();
     }
@@ -230,6 +239,7 @@ public partial class MainWindow : Window
         }
         var submit = ActionButton(_joining ? "Join room" : "Create room", () => _joining ? _vm.JoinRoomAsync(NormalizeCode(_joinCode)) : _vm.CreateRoomAsync(), true);
         AutomationProperties.SetAutomationId(submit, "RoomSubmit");
+        _submit = submit; _submitLabel = _joining ? "Join room" : "Create room";
         Space(submit, _compact ? 12 : 20); panel.Children.Add(submit);
         var options = Button("Connection options", () => Navigate("Connections"));
         Space(options, _compact ? 16 : 24); panel.Children.Add(options);
@@ -242,11 +252,14 @@ public partial class MainWindow : Window
         var panel = new StackPanel();
         panel.Children.Add(Text(_vm.Screen == Screen.Connected ? "Room connected" : _vm.Screen == Screen.Hosting ? "Your room is open" : "Connecting to room", size: 18));
         var codeLabel = Text("Room code", true, 11); Space(codeLabel, _compact ? 16 : 24); panel.Children.Add(codeLabel);
-        _roomCode = Text(_vm.RoomCode, size: 32); _roomCode.Style = (Style)FindResource("Mono"); Space(_roomCode, 8, 14); panel.Children.Add(_roomCode);
+        _roomCode = Text(_vm.RoomCode == _revealedCode ? _vm.RoomCode : "", size: 32); _roomCode.Style = (Style)FindResource("Mono"); Space(_roomCode, 8, 14); panel.Children.Add(_roomCode);
+        AutomationProperties.SetName(_roomCode, $"Room code {_vm.RoomCode}");
         Button? copy = null;
+        var copied = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        copied.Tick += (_, _) => { copied.Stop(); copy!.Content = "Copy room code"; };
         copy = Button("Copy room code", () =>
         {
-            try { Clipboard.SetText(_vm.RoomCode); copy!.Content = "Copied"; }
+            try { Clipboard.SetText(_vm.RoomCode); copy!.Content = "Copied"; copied.Stop(); copied.Start(); }
             catch { _error!.Text = "Couldn’t copy. Share the code shown above."; _error.Visibility = Visibility.Visible; }
         });
         panel.Children.Add(copy); Divider(panel, _compact ? 12 : 22);
@@ -257,12 +270,12 @@ public partial class MainWindow : Window
             AccentRow(panel, "Password", network.Passphrase);
             Divider(panel, _compact ? 12 : 22);
         }
-        _connectionRow = AddRow(panel, "Connection", _vm.ConnectionKind ?? (_vm.Screen == Screen.Connected ? "Direct" : "Pending"));
+        _connectionRow = AddRow(panel, "Connection", RoomBadge.Connection(_vm.ConnectionKind, _vm.Screen == Screen.Connected, _vm.Players));
         _localConsoleRow = AddRow(panel, "Your console", _vm.LocalConsoleIdentity ?? "Not identified");
         _playerRows = new StackPanel(); _playerRowsShown = "";
         panel.Children.Add(_playerRows);
         RefreshPlayerRows();
-        _internetRow = AddRow(panel, "Console Internet", DescribeConsoleInternet(_vm.ConsoleInternet));
+        _internetRow = AddRow(panel, "Console Internet", NetworkDiagram.DescribeInternet(_vm.ConsoleInternet ?? ""));
         Divider(panel, _compact ? 12 : 22);
         panel.Children.Add(Text(_vm.Screen == Screen.Connected ? "Open your game’s LAN menu." : "Share this code with your friend.", true));
         var leave = ActionButton("Leave room", () => _vm.DisconnectAsync()); Space(leave, _compact ? 16 : 24); panel.Children.Add(leave);
@@ -486,14 +499,62 @@ public partial class MainWindow : Window
         }
     }
 
-    private static string DescribeConsoleInternet(string? state) => state switch
+    private void RevealRoomCode()
     {
-        "Ready" => "Through this PC",
-        "Starting" => "Setting up…",
-        "Waiting" => "Waiting for the console",
-        "Unavailable" => "Unavailable",
-        _ => "Off",
-    };
+        var code = _vm.RoomCode;
+        if (_roomCode is null || _codeScramble?.IsEnabled == true) return;
+        if (code == _revealedCode || code.Length == 0 || !MotionAllowed)
+        {
+            _roomCode.Text = code;
+            _revealedCode = code;
+            return;
+        }
+
+        const string pool = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        var frame = 0;
+        var target = _roomCode;
+        _revealedCode = code;
+        _codeScramble = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };
+        _codeScramble.Tick += (_, _) =>
+        {
+            var settled = ++frame / 3;
+            target.Text = new string(code.Select((c, i) => i < settled || c == '-' ? c : pool[Random.Shared.Next(pool.Length)]).ToArray());
+            if (settled < code.Length) return;
+            _codeScramble!.Stop();
+            target.Text = code;
+        };
+        _codeScramble.Start();
+    }
+
+    private void RefreshSubmit()
+    {
+        if (_submit is null) return;
+        var busy = _vm.IsBusy && _initialized;
+        if (!busy)
+        {
+            _submit.IsHitTestVisible = true;
+            if (_submit.Content is not string) _submit.Content = _submitLabel;
+            AutomationProperties.SetItemStatus(_submit, "");
+            return;
+        }
+
+        _submit.IsEnabled = true;
+        _submit.IsHitTestVisible = false;
+        AutomationProperties.SetItemStatus(_submit, "Working");
+        if (_submit.Content is StackPanel) return;
+        var arc = new System.Windows.Shapes.Path
+        {
+            Width = 14, Height = 14, Stroke = _submit.Foreground, StrokeThickness = 2, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
+            Data = Geometry.Parse("M 7,1 A 6,6 0 1 1 1,7"), RenderTransformOrigin = new Point(.5, .5), RenderTransform = new RotateTransform(),
+            Margin = new Thickness(0, 0, 9, 0), VerticalAlignment = VerticalAlignment.Center,
+        };
+        if (MotionAllowed)
+            arc.RenderTransform.BeginAnimation(RotateTransform.AngleProperty, new DoubleAnimation(0, 360, TimeSpan.FromSeconds(.8)) { RepeatBehavior = RepeatBehavior.Forever });
+        var content = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+        content.Children.Add(arc);
+        content.Children.Add(new TextBlock { Text = _submitLabel, VerticalAlignment = VerticalAlignment.Center });
+        _submit.Content = content;
+    }
 
     private static string DescribeAdapter(IpcAdapterInfo adapter)
     {

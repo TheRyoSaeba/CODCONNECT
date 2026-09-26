@@ -7,10 +7,11 @@ using System.Windows.Media.Animation;
 
 namespace CODConnect.UI;
 
-public sealed record FriendVisual(string Name, bool Attached, bool Ready, string? Detail = null);
+public sealed record FriendVisual(string Name, bool Attached, bool Ready, string? Detail = null, bool Relay = false, bool Lost = false);
 
 public sealed record NetworkVisualState(bool LocalReady, bool RemoteReady, bool TunnelConnected,
-    bool LocalAttached = false, bool RemoteAttached = false, IReadOnlyList<FriendVisual>? Friends = null)
+    bool LocalAttached = false, bool RemoteAttached = false, IReadOnlyList<FriendVisual>? Friends = null,
+    string? LocalDetail = null, string? Internet = null, bool Relayed = false)
 {
     public bool LanReady => Friends is { Count: > 1 } friends
         ? LocalReady && TunnelConnected && friends.Any(f => f.Attached) && friends.Where(f => f.Attached).All(f => f.Ready)
@@ -22,7 +23,8 @@ public sealed record NetworkVisualState(bool LocalReady, bool RemoteReady, bool 
     public bool Equals(NetworkVisualState? other)
         => other is not null && LocalReady == other.LocalReady && RemoteReady == other.RemoteReady
            && TunnelConnected == other.TunnelConnected && LocalAttached == other.LocalAttached
-           && RemoteAttached == other.RemoteAttached
+           && RemoteAttached == other.RemoteAttached && LocalDetail == other.LocalDetail
+           && Internet == other.Internet && Relayed == other.Relayed
            && (Friends ?? []).SequenceEqual(other.Friends ?? []);
 
     public override int GetHashCode() => HashCode.Combine(LocalReady, RemoteReady, TunnelConnected, Friends?.Count ?? 0);
@@ -103,14 +105,18 @@ public sealed class NetworkDiagram : FrameworkElement
         protected override string GetNameCore() => owner.State.Friends is { Count: > 1 } friends
             ? $"Network with {friends.Count + 1} players. {friends.Count(f => f.Ready) + (owner.State.LocalReady ? 1 : 0)} consoles ready. " + (owner.State.LanReady ? "LAN ready." : "Waiting for every console.")
             : $"Network. Your side {(owner.State.LocalReady ? "ready" : "not confirmed")}. Friend’s side {(owner.State.RemoteReady ? "ready" : "not confirmed")}. " +
-            (owner.State.LanReady ? "LAN ready." : owner.State.TunnelConnected ? "PC tunnel connected; console readiness not confirmed on both sides." : "Waiting for the PC tunnel.");
+            (owner.State.LanReady ? "LAN ready." : owner.State.TunnelConnected ? "PC tunnel connected; console readiness not confirmed on both sides." : "Waiting for the PC tunnel.")
+            + (owner.State.Relayed ? " Connected through the relay." : "")
+            + (owner.State.Internet is { } internet ? $" Console Internet: {DescribeInternet(internet)}." : "");
     }
 
     private static Brush Brush(string hex)
     {
         var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex)); brush.Freeze(); return brush;
     }
-    private static readonly Brush Accent = Brush("#73D9E5"), Blue = Brush("#65C8FF"), Text = Brush("#EAE9EF"), Muted = Brush("#A1A0AB");
+    private static readonly Brush Accent = Brush("#73D9E5"), Blue = Brush("#65C8FF"), Text = Brush("#EAE9EF"), Muted = Brush("#A1A0AB"), Warn = Brush("#E6B58C");
+
+    private enum Glyph { Console, Pc, Globe }
     private static readonly Point Center = new(340, 280);
 
     protected override void OnRender(DrawingContext dc)
@@ -151,10 +157,12 @@ public sealed class NetworkDiagram : FrameworkElement
         dc.DrawGeometry(Brush(State.LanReady ? "#439DDD" : "#527F88"), null, Geometry.Parse("M 333,247 L 344,247 L 355,269 L 344,269 Z"));
         Label(dc, "CODCONNECT", 340, 286, Text, 12);
         Label(dc, State.LanReady ? "LAN ready" : "Virtual LAN", 340, 308, State.LanReady ? Blue : Muted, 11);
-        Node(dc, 120, 105, true, State.LocalReady, State.LocalReady);
-        Node(dc, 560, 105, true, State.RemoteReady, State.RemoteReady);
-        Node(dc, 120, 280, false, State.LocalAttached || State.LocalReady, State.LocalReady);
-        Node(dc, 560, 280, false, State.RemoteAttached || State.RemoteReady, State.RemoteReady);
+        if (State.Relayed) RelayMarker(dc, new Point(340, 416), State.TunnelConnected);
+        if (State.Internet is { } internet) InternetNode(dc, internet);
+        Node(dc, 120, 105, Glyph.Console, State.LocalReady, State.LocalReady);
+        Node(dc, 560, 105, Glyph.Console, State.RemoteReady, State.RemoteReady);
+        Node(dc, 120, 280, Glyph.Pc, State.LocalAttached || State.LocalReady, State.LocalReady);
+        Node(dc, 560, 280, Glyph.Pc, State.RemoteAttached || State.RemoteReady, State.RemoteReady);
         var friend = State.Friends is { Count: 1 } one ? Short(one[0].Name) : null;
         Label(dc, "Your console", 120, 57, Text);
         Label(dc, friend is null ? "Friend’s console" : $"{friend}’s console", 560, 57, Text);
@@ -173,18 +181,21 @@ public sealed class NetworkDiagram : FrameworkElement
         dc.DrawEllipse(null, new Pen(Brush("#34343B"), 7), Center, 118, 118);
         dc.DrawEllipse(null, new Pen(Brush("#202025"), 2), Center, 118, 118);
 
-        var players = new List<(string Name, bool Attached, bool Ready, string? Detail)> { ("You", State.LocalAttached, State.LocalReady, null) };
-        players.AddRange(friends.Select(f => (Short(f.Name), f.Attached, f.Ready, f.Detail)));
+        var players = new List<(string Name, bool Attached, bool Ready, string? Detail, bool Relay, bool Lost)> { ("You", State.LocalAttached, State.LocalReady, State.LocalDetail, false, false) };
+        players.AddRange(friends.Select(f => (Short(f.Name), f.Attached, f.Ready, f.Detail, f.Relay && f.Attached && !f.Lost, f.Lost)));
         var positions = players.Select((_, i) =>
         {
             var angle = Math.PI + i * 2 * Math.PI / players.Count;
             return new Point(Center.X + orbit * Math.Cos(angle), Center.Y + orbit * Math.Sin(angle));
         }).ToList();
 
+        var spokes = players.Select((p, i) => SpokeGeometry(positions[i], orbit, p.Relay)).ToList();
         for (var i = 0; i < players.Count; i++)
         {
-            var (from, to) = Spoke(positions[i], 122, orbit - 30);
-            dc.DrawLine(new Pen(Brush(players[i].Attached ? "#4E6970" : "#414149"), 4) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round }, from, to);
+            var pen = new Pen(players[i].Lost ? Warn : Brush(players[i].Attached ? "#4E6970" : "#414149"), players[i].Lost ? 2.5 : 4)
+            { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round };
+            if (players[i].Lost) pen.DashStyle = new DashStyle(new[] { 2d, 3d }, 0);
+            dc.DrawGeometry(null, pen, spokes[i].Geometry);
         }
 
         dc.DrawEllipse(Brush("#202025"), new Pen(Brush("#3C3C44"), 1), Center, 71, 71);
@@ -198,8 +209,7 @@ public sealed class NetworkDiagram : FrameworkElement
             var group = new DrawingGroup();
             using (var glow = group.Open())
             {
-                var (from, to) = Spoke(positions[i], 122, orbit - 30);
-                GlowStroke(glow, new LineGeometry(from, to), 2);
+                GlowStroke(glow, spokes[i].Geometry, 2);
             }
 
             _glows.Add(group); dc.DrawDrawing(group);
@@ -213,15 +223,80 @@ public sealed class NetworkDiagram : FrameworkElement
 
         for (var i = 0; i < players.Count; i++)
         {
+            if (spokes[i].Relay is { } relay) RelayMarker(dc, relay, players[i].Ready);
+        }
+
+        for (var i = 0; i < players.Count; i++)
+        {
             var (x, y) = (positions[i].X, positions[i].Y);
-            Node(dc, x, y, true, players[i].Attached || players[i].Ready, players[i].Ready);
+            Node(dc, x, y, Glyph.Console, players[i].Attached || players[i].Ready, players[i].Ready, players[i].Lost);
+            if (i == 0 && State.Internet is { } internet) InternetBadge(dc, x, y, internet == "Ready");
             var above = y < Center.Y - 40;
             var top = above ? y - (players[i].Detail is null ? 50 : 66) : y + 30;
             Label(dc, players[i].Name, x, top, Text);
             if (players[i].Detail is { } detail)
-                Label(dc, detail, x, top + 18, players[i].Ready ? Accent : Muted, 11);
+                Label(dc, detail, x, top + 18, players[i].Lost ? Warn : players[i].Ready ? Accent : Muted, 11);
         }
     }
+
+    private static (Geometry Geometry, Point? Relay) SpokeGeometry(Point player, double orbit, bool relay)
+    {
+        var (from, to) = Spoke(player, 122, orbit - 30);
+        if (!relay) return (new LineGeometry(from, to), null);
+        var dx = to.X - from.X;
+        var dy = to.Y - from.Y;
+        var length = Math.Sqrt(dx * dx + dy * dy);
+        var bend = new Point((from.X + to.X) / 2 - dy / length * 30, (from.Y + to.Y) / 2 + dx / length * 30);
+        var path = new PathGeometry([new PathFigure(from, [new PolyLineSegment([bend, to], true)], false)]);
+        return (path, bend);
+    }
+
+    private void RelayMarker(DrawingContext dc, Point at, bool live)
+    {
+        var stroke = live ? Blue : Accent;
+        dc.DrawEllipse(Brush(live ? "#172C3B" : "#1E2F33"), new Pen(stroke, 1.2), at, 15, 15);
+        var (x, y) = (at.X, at.Y);
+        dc.DrawGeometry(null, new Pen(stroke, 1.3) { LineJoin = PenLineJoin.Round }, Geometry.Parse(FormattableString.Invariant(
+            $"M {x - 7},{y + 4.5} L {x + 6.5},{y + 4.5} A 3.6,3.6 0 0 0 {x + 7},{y - 2.5} A 5.2,5.2 0 0 0 {x - 2.6},{y - 3.8} A 4.2,4.2 0 0 0 {x - 7},{y + 4.5} Z")));
+        Label(dc, "Relay", x, y + 17, stroke, 10);
+    }
+
+    private void InternetNode(DrawingContext dc, string state)
+    {
+        var ready = state == "Ready";
+        var active = ready || state == "Starting";
+        Path(dc, "M 120,352 L 120,410", active ? "#4E6970" : "#414149", 2, !ready);
+        if (ready)
+        {
+            var group = new DrawingGroup();
+            using (var glow = group.Open()) GlowStroke(glow, Geometry.Parse("M 120,352 L 120,410"), 2);
+            _glows.Add(group); dc.DrawDrawing(group);
+        }
+
+        Node(dc, 120, 434, Glyph.Globe, active, ready);
+        Label(dc, "Internet", 120, 464, Text);
+        Label(dc, DescribeInternet(state), 120, 482, ready ? Accent : state == "Unavailable" ? Warn : Muted, 11);
+    }
+
+    private static void InternetBadge(DrawingContext dc, double x, double y, bool ready)
+    {
+        var stroke = ready ? Blue : Brush("#6A6A73");
+        var at = new Point(x - 18, y - 18);
+        dc.DrawEllipse(Brush(ready ? "#172C3B" : "#25252B"), new Pen(stroke, 1), at, 7, 7);
+        var pen = new Pen(stroke, 0.9);
+        dc.DrawEllipse(null, pen, at, 3.8, 3.8);
+        dc.DrawEllipse(null, pen, at, 1.6, 3.8);
+        dc.DrawLine(pen, new Point(at.X - 3.8, at.Y), new Point(at.X + 3.8, at.Y));
+    }
+
+    internal static string DescribeInternet(string state) => state switch
+    {
+        "Ready" => "Through this PC",
+        "Starting" => "Setting up…",
+        "Waiting" => "Waiting for the console",
+        "Unavailable" => "Unavailable",
+        _ => "Off",
+    };
 
     private static (Point From, Point To) Spoke(Point player, double inner, double outer)
     {
@@ -288,13 +363,19 @@ public sealed class NetworkDiagram : FrameworkElement
         dc.DrawGeometry(null, pen, Geometry.Parse(data));
     }
 
-    private static void Node(DrawingContext dc, double x, double y, bool console, bool attached, bool ready)
+    private static void Node(DrawingContext dc, double x, double y, Glyph glyph, bool attached, bool ready, bool lost = false)
     {
-        var foreground = ready ? Blue : attached ? Accent : Muted;
-        dc.DrawRoundedRectangle(Brush(ready ? "#223544" : attached ? "#273439" : "#25252B"),
-            new Pen(ready ? Blue : Brush(attached ? "#587F86" : "#494950"), 1), new Rect(x - 24, y - 24, 48, 48), 7, 7);
+        var foreground = lost ? Warn : ready ? Blue : attached ? Accent : Muted;
+        dc.DrawRoundedRectangle(Brush(lost ? "#2B2520" : ready ? "#223544" : attached ? "#273439" : "#25252B"),
+            new Pen(lost ? Warn : ready ? Blue : Brush(attached ? "#587F86" : "#494950"), 1), new Rect(x - 24, y - 24, 48, 48), 7, 7);
         var pen = new Pen(foreground, 1.4);
-        if (console)
+        if (glyph == Glyph.Globe)
+        {
+            dc.DrawEllipse(null, pen, new Point(x, y), 10, 10);
+            dc.DrawEllipse(null, pen, new Point(x, y), 4.5, 10);
+            dc.DrawLine(pen, new Point(x - 10, y), new Point(x + 10, y));
+        }
+        else if (glyph == Glyph.Console)
         {
             dc.DrawRoundedRectangle(null, pen, new Rect(x - 7, y - 12, 14, 24), 2, 2);
             dc.DrawLine(pen, new Point(x - 3, y - 7), new Point(x + 3, y - 7));
@@ -306,7 +387,7 @@ public sealed class NetworkDiagram : FrameworkElement
             dc.DrawLine(pen, new Point(x, y + 6), new Point(x, y + 11));
             dc.DrawLine(pen, new Point(x - 7, y + 11), new Point(x + 7, y + 11));
         }
-        if (ready)
+        if (ready && !lost)
         {
             dc.DrawEllipse(Brush("#172C3B"), new Pen(Blue, 1), new Point(x + 18, y - 18), 6, 6);
             dc.DrawGeometry(null, new Pen(Blue, 1.2), Geometry.Parse(FormattableString.Invariant($"M {x + 15},{y - 18} L {x + 17},{y - 16} {x + 21},{y - 20}")));

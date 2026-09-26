@@ -4,6 +4,9 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Shapes;
+using System.Windows.Threading;
 
 namespace CODConnect.UI;
 
@@ -18,6 +21,9 @@ public partial class MainWindow
     private Button? _chatSend;
     private string _chatDraft = "", _chatRoom = "", _chatRendered = "";
     private int _unreadChat;
+    private DispatcherTimer? _bannerTimer;
+
+    private static bool MotionAllowed => SystemParameters.ClientAreaAnimation && !SystemParameters.HighContrast;
 
     private void ShowChat()
     {
@@ -46,7 +52,11 @@ public partial class MainWindow
         var composer = new Grid(); composer.ColumnDefinitions.Add(new ColumnDefinition()); composer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _chatInput = new TextBox { Text = _chatDraft, MaxLength = 320, Height = 42, VerticalContentAlignment = VerticalAlignment.Center, HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden, VerticalScrollBarVisibility = ScrollBarVisibility.Hidden };
         AutomationProperties.SetName(_chatInput, "Message to room");
-        _chatInput.TextChanged += (_, _) => { _chatDraft = _chatInput.Text; UpdateChatComposer(); };
+        _chatInput.TextChanged += (_, _) =>
+        {
+            _chatDraft = _chatInput.Text; UpdateChatComposer();
+            if (!string.IsNullOrWhiteSpace(_chatDraft)) _ = _vm.NotifyTypingAsync();
+        };
         _chatInput.KeyDown += async (_, e) => { if (e.Key == Key.Enter) { e.Handled = true; await SendChat(); } };
         _chatSend = Button("Send", async () => await SendChat(), true); _chatSend.Margin = new Thickness(8, 0, 0, 0); Grid.SetColumn(_chatSend, 1);
         composer.Children.Add(_chatInput); composer.Children.Add(_chatSend); Grid.SetRow(composer, 1); layout.Children.Add(composer);
@@ -103,17 +113,18 @@ public partial class MainWindow
     {
         if (_page != "Chat" || _chatMessages is null || _chatScroll is null) return;
         var messages = _vm.Chat?.Messages ?? [];
+        var typing = _vm.Chat?.Typing ?? [];
         var connected = _vm.Chat?.Peers.Any(p => p.Connected) == true;
 
         var signature = $"{_vm.IsHome}|{connected}|{messages.Count}|{(messages.Count > 0 ? messages[^1].Id : 0)}|"
-            + string.Join(",", messages.Where(m => m.Own).Select(m => m.Delivery[0]));
+            + string.Join(",", messages.Where(m => m.Own).Select(m => m.Delivery[0])) + "|" + string.Join(",", typing);
         if (signature == _chatRendered) return;
         _chatRendered = signature;
 
         var atBottom = _chatScroll.VerticalOffset >= _chatScroll.ScrollableHeight - 4;
         _chatMessages.Children.Clear();
 
-        if (messages.Count == 0)
+        if (messages.Count == 0 && typing.Count == 0)
         {
             var empty = Text(_vm.IsHome ? "Chat opens when you’re in a room." : connected ? "Say hello." : "Chat opens when your friend joins.", true, 13);
             empty.HorizontalAlignment = HorizontalAlignment.Center; empty.Margin = new Thickness(0, 0, 0, 24);
@@ -136,6 +147,11 @@ public partial class MainWindow
 
             _chatMessages.Children.Add(Turn(turn, bubbleWidth));
             i += turn.Count;
+        }
+
+        foreach (var name in typing)
+        {
+            _chatMessages.Children.Add(TypingBubble(name));
         }
 
         if (atBottom) _chatScroll.ScrollToEnd();
@@ -182,12 +198,33 @@ public partial class MainWindow
         return panel;
     }
 
+    private StackPanel TypingBubble(string name)
+    {
+        var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 14), HorizontalAlignment = HorizontalAlignment.Left };
+        var author = Text(name, true, 11); author.Margin = new Thickness(4, 0, 0, 4);
+        panel.Children.Add(author);
+        var dots = new StackPanel { Orientation = Orientation.Horizontal };
+        for (var i = 0; i < 3; i++)
+        {
+            var dot = new Ellipse { Width = 5, Height = 5, Fill = Color("MutedBrush"), Margin = new Thickness(i == 0 ? 0 : 4, 0, 0, 0) };
+            if (MotionAllowed)
+                dot.BeginAnimation(OpacityProperty, new DoubleAnimation(1, .25, TimeSpan.FromMilliseconds(500))
+                { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, BeginTime = TimeSpan.FromMilliseconds(i * 150) });
+            dots.Children.Add(dot);
+        }
+        var bubble = new Border { Child = dots, Background = Color("PanelLightBrush"), CornerRadius = new CornerRadius(10), Padding = new Thickness(12, 11, 12, 11), HorizontalAlignment = HorizontalAlignment.Left };
+        AutomationProperties.SetName(bubble, $"{name} is typing");
+        panel.Children.Add(bubble);
+        return panel;
+    }
+
     private void OnIncomingChat(ChatMessage message)
     {
         var windowVisible = IsActive && WindowState != WindowState.Minimized;
         if (windowVisible && _page == "Chat") return;
 
         _unreadChat++;
+        ChatUnreadCount.Text = _unreadChat > 9 ? "9+" : _unreadChat.ToString();
         ChatUnreadDot.Visibility = Visibility.Visible;
         ChatNav.ToolTip = _unreadChat == 1 ? "Room chat - 1 new message" : $"Room chat - {_unreadChat} new messages";
 
@@ -195,6 +232,37 @@ public partial class MainWindow
         {
             ChatToasts.Show(message.Author, message.Text);
         }
+        else
+        {
+            ShowChatBanner(message);
+        }
+    }
+
+    private void ShowChatBanner(ChatMessage message)
+    {
+        ChatBannerAuthor.Text = message.Author;
+        ChatBannerText.Text = message.Text.Replace('\r', ' ').Replace('\n', ' ');
+        AutomationProperties.SetHelpText(ChatBanner, $"{message.Author}: {message.Text}");
+        ChatBanner.Visibility = Visibility.Visible;
+        if (MotionAllowed)
+        {
+            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+            ChatBanner.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(250)));
+            ((TranslateTransform)ChatBanner.RenderTransform).BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(28, 0, TimeSpan.FromMilliseconds(380)) { EasingFunction = ease });
+        }
+
+        _bannerTimer ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _bannerTimer.Tick -= HideChatBanner;
+        _bannerTimer.Tick += HideChatBanner;
+        _bannerTimer.Stop();
+        _bannerTimer.Start();
+    }
+
+    private void HideChatBanner(object? sender = null, EventArgs? e = null)
+    {
+        _bannerTimer?.Stop();
+        ChatBanner.BeginAnimation(OpacityProperty, null);
+        ChatBanner.Visibility = Visibility.Collapsed;
     }
 
     private void ClearUnreadChat()
@@ -202,6 +270,7 @@ public partial class MainWindow
         _unreadChat = 0;
         ChatUnreadDot.Visibility = Visibility.Collapsed;
         ChatNav.ToolTip = "Room chat";
+        HideChatBanner();
     }
 
     private void OpenChatFromNotification()

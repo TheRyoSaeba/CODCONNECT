@@ -11,6 +11,13 @@ public sealed class SessionManager : IAsyncDisposable
             chat.Send(message);
         }
     }
+    public void NotifyTyping()
+    {
+        lock (_lock)
+        {
+            _session?.Chat?.NotifyTyping();
+        }
+    }
     private readonly Func<string?, bool, Task<IConsoleNetworkInterface>> _consoleFactory;
     private readonly IRoomTransport _transport;
     private readonly HttpClient _rendezvous;

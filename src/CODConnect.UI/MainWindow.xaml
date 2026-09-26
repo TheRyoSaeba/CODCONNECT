@@ -21,7 +21,7 @@
        <Button x:Name="RoomNav" Style="{StaticResource NavButton}" ToolTip="Room" AutomationProperties.Name="Room"><Path Width="17" Height="17" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.2" Data="M 6,1 L 11,1 11,6 6,6 Z M 1,11 L 6,11 6,16 1,16 Z M 11,11 L 16,11 16,16 11,16 Z M 8.5,6 L 8.5,8.5 M 3.5,11 L 3.5,8.5 13.5,8.5 13.5,11"/></Button>
        <Button x:Name="AdaptersNav" Style="{StaticResource NavButton}" ToolTip="Connections" AutomationProperties.Name="Connections"><Path Width="17" Height="17" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.2" Data="M 2,1 L 15,1 15,11 11,11 11,15 6,15 6,11 2,11 Z M 5,4 L 5,7 M 8.5,4 L 8.5,7 M 12,4 L 12,7"/></Button>
        <Button x:Name="DiagnosticsNav" Style="{StaticResource NavButton}" ToolTip="Diagnostics" AutomationProperties.Name="Diagnostics"><Path Width="19" Height="17" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.2" Data="M 0,9 L 4,9 7,2 11,15 14,7 16,9 19,9"/></Button>
-       <Button x:Name="ChatNav" Style="{StaticResource NavButton}" ToolTip="Room chat" AutomationProperties.Name="Room chat"><Grid><Path Width="18" Height="18" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.2" Data="M 2,2 L 16,2 16,12 8,12 3,16 3,12 2,12 Z M 5,6 L 13,6 M 5,9 L 10,9"/><Ellipse x:Name="ChatUnreadDot" Width="7" Height="7" Fill="{StaticResource AccentBrush}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-3,-4,0" Visibility="Collapsed"/></Grid></Button>
+       <Button x:Name="ChatNav" Style="{StaticResource NavButton}" ToolTip="Room chat" AutomationProperties.Name="Room chat"><Grid><Path Width="18" Height="18" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.2" Data="M 2,2 L 16,2 16,12 8,12 3,16 3,12 2,12 Z M 5,6 L 13,6 M 5,9 L 10,9"/><Border x:Name="ChatUnreadDot" MinWidth="15" Height="15" CornerRadius="7.5" Padding="4,0" Background="{StaticResource AccentBrush}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-7,-10,0" Visibility="Collapsed"><TextBlock x:Name="ChatUnreadCount" Text="1" FontSize="9" FontWeight="Bold" Foreground="#0E1A1C" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></Grid></Button>
        <Button x:Name="DevNav" Style="{StaticResource NavButton}" ToolTip="Optional features" AutomationProperties.Name="Optional features"><Path Width="18" Height="15" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.2" Data="M 5,2 L 1,7.5 5,13 M 13,2 L 17,7.5 13,13 M 10,1 L 8,14"/></Button>
       </StackPanel>
      </DockPanel>
@@ -35,6 +35,15 @@
      <Grid Grid.Row="1" x:Name="NetworkView"><local:NetworkDiagram x:Name="Diagram" Margin="8,0"/></Grid>
      <Grid x:Name="DetailView" Grid.Row="1" Margin="28,16,28,0" Visibility="Collapsed"><StackPanel x:Name="DetailContent"/></Grid>
      <TextBlock x:Name="CanvasHint" Grid.Row="2" Visibility="Collapsed" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="28,0" VerticalAlignment="Center"/>
+     <Border x:Name="ChatBanner" Grid.Row="1" Grid.RowSpan="2" Width="270" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,22,18" Padding="14,11" CornerRadius="10" Background="#2A2A31" BorderBrush="#3A3A42" BorderThickness="1" Cursor="Hand" Visibility="Collapsed" AutomationProperties.Name="New room chat message" AutomationProperties.LiveSetting="Polite">
+      <Border.Effect><DropShadowEffect BlurRadius="24" ShadowDepth="6" Opacity="0.45" Color="Black"/></Border.Effect>
+      <Border.RenderTransform><TranslateTransform/></Border.RenderTransform>
+      <StackPanel>
+       <TextBlock Text="Room chat" FontSize="10" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,5"/>
+       <TextBlock x:Name="ChatBannerAuthor" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+       <TextBlock x:Name="ChatBannerText" FontSize="12" Foreground="#CFCED6" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="34"/>
+      </StackPanel>
+     </Border>
     </Grid>
     <Border Grid.Column="2" Background="{StaticResource PanelBrush}" BorderBrush="#111114" BorderThickness="1,0,0,0">
      <ContentControl x:Name="ScreenHost" Margin="26,27,26,20" HorizontalContentAlignment="Stretch"/>

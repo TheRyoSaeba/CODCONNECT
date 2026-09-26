@@ -94,6 +94,27 @@ public sealed class AppViewModel : INotifyPropertyChanged
         finally { ChatSending = false; OnPropertyChanged(nameof(Chat)); }
     }
 
+    private DateTimeOffset _lastTyping = DateTimeOffset.MinValue;
+
+    public async Task NotifyTypingAsync()
+    {
+        var now = DateTimeOffset.UtcNow;
+        if (now - _lastTyping < TimeSpan.FromSeconds(2.5) || Chat?.Peers.Any(p => p.Connected) != true) return;
+        _lastTyping = now;
+        try
+        {
+            if (BackendMode == "service")
+            {
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                await _pipe.SendAsync(new IpcRequest("chat-typing"), timeout.Token);
+            }
+            else _embedded?.NotifyTyping();
+        }
+        catch
+        {
+        }
+    }
+
     public string RoomCode { get; private set; } = string.Empty;
 
     public bool JoinMode { get; private set; }
@@ -191,6 +212,8 @@ public sealed class AppViewModel : INotifyPropertyChanged
     }
 
     public IReadOnlyList<IpcPlayer> Players { get; private set; } = [];
+
+    public IReadOnlyCollection<string> ReconnectingPlayers { get; private set; } = [];
 
     public string? RoomEvent => DateTimeOffset.UtcNow < _roomEventUntil ? _roomEvent : null;
 
@@ -430,6 +453,7 @@ public sealed class AppViewModel : INotifyPropertyChanged
         ConnectionKind = null;
         ConsoleInternet = null;
         Players = [];
+        ReconnectingPlayers = [];
         _players = [];
         _everConnected.Clear();
         _roomEvent = null;
@@ -558,17 +582,22 @@ public sealed class AppViewModel : INotifyPropertyChanged
             }
 
             _players = listed;
+            var lost = Players.Where(p => !p.Connected && _everConnected.Contains(p.Name)).Select(p => p.Name).ToHashSet();
+            ReconnectingPlayers = lost;
+            LocalConsoleIdentity = DescribeSide(devices, "Local");
+            RemoteConsoleIdentity = tunnelUp ? DescribeSide(devices, "Remote") : null;
+            ConnectionKind = tunnelUp ? connectionKind : null;
+            ConsoleInternet = BackendMode == "service" ? _lastStatus?.ConsoleInternet : _embedded!.ConsoleInternet;
             Visual = new NetworkVisualState(
                 LocalReady: localReady,
                 RemoteReady: remoteReady && tunnelUp,
                 TunnelConnected: tunnelUp,
                 LocalAttached: true,
                 RemoteAttached: tunnelUp,
-                Friends: Players.Select(p => new FriendVisual(p.Name, p.Connected, p.ConsoleReady, RoomBadge.PlayerDetail(p))).ToArray());
-            LocalConsoleIdentity = DescribeSide(devices, "Local");
-            RemoteConsoleIdentity = tunnelUp ? DescribeSide(devices, "Remote") : null;
-            ConnectionKind = tunnelUp ? connectionKind : null;
-            ConsoleInternet = BackendMode == "service" ? _lastStatus?.ConsoleInternet : _embedded!.ConsoleInternet;
+                Friends: Players.Select(p => new FriendVisual(p.Name, p.Connected, p.ConsoleReady, RoomBadge.PlayerDetail(p, lost.Contains(p.Name)), p.Relay, lost.Contains(p.Name))).ToArray(),
+                LocalDetail: localReady ? LocalConsoleIdentity ?? "Console ready" : "No console yet",
+                Internet: ConsoleInternet,
+                Relayed: ConnectionKind == "Relay" || Players is [{ Connected: true, Relay: true }]);
             OnPropertyChanged(nameof(Visual));
 
             if (tunnel == "Connected" && Screen != Screen.Connected)

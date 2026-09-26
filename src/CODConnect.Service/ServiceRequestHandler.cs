@@ -28,6 +28,7 @@ public sealed class ServiceRequestHandler : IIpcHandler
                 "join" => await JoinAsync(request, cancellationToken).ConfigureAwait(false),
                 "status" => new IpcResponse(true, Status: BuildStatus()),
                 "chat-send" => SendChat(request),
+                "chat-typing" => Typing(),
                 "wifi-capability" => new IpcResponse(true, WifiCapability: await _sessions.CheckWifiAsync(cancellationToken).ConfigureAwait(false)),
                 "stop" => await StopAsync().ConfigureAwait(false),
                 "dev-settings" => new IpcResponse(true, DevSettings: DevSnapshot()),
@@ -84,6 +85,12 @@ public sealed class ServiceRequestHandler : IIpcHandler
     }
 
     private static bool IsWifi(IpcRequest request) => string.Equals(request.Mode, "wifi", StringComparison.OrdinalIgnoreCase);
+
+    private IpcResponse Typing()
+    {
+        _sessions.NotifyTyping();
+        return new IpcResponse(true);
+    }
 
     private IpcResponse SendChat(IpcRequest request)
     {

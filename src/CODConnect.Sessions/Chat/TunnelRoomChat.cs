@@ -10,7 +10,7 @@ public sealed class TunnelRoomChat : IAsyncDisposable
     private const int MaxHistory = 80;
     private const int Header = 25;
     private const int MaxPeers = 7;
-    private const byte TypeHello = 1, TypeMessage = 3, TypeAck = 4;
+    private const byte TypeHello = 1, TypeMessage = 3, TypeAck = 4, TypeTyping = 5;
     private const int MaxConsoleName = 16;
     private static readonly byte[] Broadcast = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
     private static ReadOnlySpan<byte> Magic => "CODCHAT2"u8;
@@ -18,6 +18,8 @@ public sealed class TunnelRoomChat : IAsyncDisposable
     private static readonly TimeSpan PeerTimeout = TimeSpan.FromSeconds(12);
     private static readonly TimeSpan RetryInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan GiveUpAfter = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan TypingShownFor = TimeSpan.FromSeconds(4);
+    private static readonly TimeSpan TypingResendAfter = TimeSpan.FromSeconds(2.5);
 
     private readonly string _roomId, _memberId, _name;
     private readonly Func<CancellationToken, Task<IReadOnlyList<RoomMember>>> _getMembers;
@@ -37,6 +39,7 @@ public sealed class TunnelRoomChat : IAsyncDisposable
     private long _nextLocalId;
     private ulong _nextWireId;
     private DateTimeOffset _lastSend = DateTimeOffset.MinValue;
+    private DateTimeOffset _lastTyping = DateTimeOffset.MinValue;
     private bool _started;
     private int _disposed;
 
@@ -94,7 +97,8 @@ public sealed class TunnelRoomChat : IAsyncDisposable
                 _name,
                 StateLocked(now, link),
                 ParticipantsLocked(now, link),
-                _messages.ToArray());
+                _messages.ToArray(),
+                link ? _peers.Values.Where(p => p.IsOnline(now) && p.TypingUntil > now).Select(p => p.Name).ToArray() : []);
         }
     }
 
@@ -147,6 +151,14 @@ public sealed class TunnelRoomChat : IAsyncDisposable
                 case TypeAck when payload.Length == 8 && span.Slice(0, 6).SequenceEqual(_mac):
                     OnAckLocked(source, BinaryPrimitives.ReadUInt64BigEndian(payload));
                     break;
+
+                case TypeTyping when span.Slice(0, 6).SequenceEqual(_mac):
+                    if (_peers.Values.FirstOrDefault(p => p.Mac.AsSpan().SequenceEqual(source)) is { } typist)
+                    {
+                        typist.TypingUntil = now + TypingShownFor;
+                    }
+
+                    break;
             }
         }
 
@@ -182,6 +194,7 @@ public sealed class TunnelRoomChat : IAsyncDisposable
             }
 
             _lastSend = now;
+            _lastTyping = DateTimeOffset.MinValue;
             var localId = ++_nextLocalId;
             var wireId = ++_nextWireId;
             var body = Encoding.UTF8.GetBytes(text);
@@ -194,6 +207,24 @@ public sealed class TunnelRoomChat : IAsyncDisposable
             AddMessageLocked(new ChatMessage(localId, _name, text, true, now, "Sending"));
             frames = online.Select(p => Frame(p.Mac, TypeMessage, payload)).ToList();
             outgoing.LastSent = now;
+        }
+
+        _ = SendAllAsync(frames);
+    }
+
+    public void NotifyTyping()
+    {
+        List<byte[]> frames;
+        lock (_gate)
+        {
+            var now = _clock();
+            if (now - _lastTyping < TypingResendAfter || !_linkUp())
+            {
+                return;
+            }
+
+            _lastTyping = now;
+            frames = _peers.Values.Where(p => p.IsOnline(now)).Select(p => Frame(p.Mac, TypeTyping, [])).ToList();
         }
 
         _ = SendAllAsync(frames);
@@ -324,6 +355,7 @@ public sealed class TunnelRoomChat : IAsyncDisposable
             return replies;
         }
 
+        peer.TypingUntil = DateTimeOffset.MinValue;
         AddMessageLocked(new ChatMessage(++_nextLocalId, peer.Name, text, false, now, "Received"));
         return replies;
     }
@@ -524,6 +556,7 @@ public sealed class TunnelRoomChat : IAsyncDisposable
         public byte[]? ConsoleMac { get; set; }
         public string? ConsoleName { get; set; }
         public bool Relay { get; set; }
+        public DateTimeOffset TypingUntil { get; set; }
         public HashSet<ulong> Seen { get; } = [];
 
         public bool IsOnline(DateTimeOffset now) => now - LastHello <= PeerTimeout;

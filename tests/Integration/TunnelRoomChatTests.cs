@@ -103,6 +103,23 @@ public sealed class TunnelRoomChatTests
     }
 
     [Fact]
+    public async Task Typing_ShowsForTheFriend_AndClearsWhenTheirMessageArrives()
+    {
+        await using var pair = new Pair();
+        pair.Start();
+        await Connected(pair);
+        Assert.Empty(pair.B.Snapshot().Typing ?? []);
+
+        pair.A.NotifyTyping();
+        await Wait(() => pair.B.Snapshot().Typing?.Contains("Alex") == true, () => "typing shown");
+        Assert.Empty(pair.A.Snapshot().Typing ?? []);
+
+        pair.A.Send("on my way");
+        await Wait(() => pair.B.Snapshot().Messages.Any(m => m.Text == "on my way"), () => "message");
+        Assert.Empty(pair.B.Snapshot().Typing ?? []);
+    }
+
+    [Fact]
     public async Task Input_IsValidated_AndSendingNeedsAConnectedFriend()
     {
         await using var pair = new Pair();

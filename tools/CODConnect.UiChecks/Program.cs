@@ -127,7 +127,8 @@ internal static class Program
         Click(window, "Setup"); Check(Contains(window, "Get ready to play"), "Return from troubleshooting");
         ClickNamed(window, "RoomNav");
         Set(vm, "ErrorText", ""); Set(vm, "RoomCode", "K7M4-P2"); Set(vm, "Screen", Screen.Hosting);
-        Check(Contains(window, "K7M4-P2"), "State notification switches rendered screen");
+        Pump(1100);
+        Check(Contains(window, "K7M4-P2"), "State notification switches rendered screen and the code settles");
         Render(window, output, "hosting", 1180, 760);
         Set(vm, "Screen", Screen.Connecting); Render(window, output, "connecting", 1180, 760);
         Check(Contains(window, "Connecting to friend"), "Connecting friend badge");
@@ -156,10 +157,20 @@ internal static class Program
         ClickNamed(window, "ChatNav");
         Render(window, output, "chat", 1180, 760);
         Render(window, output, "chat-small", 900, 620);
+        Set(vm, "Chat", history with { Typing = ["Jordan"] }); Notify(vm, "Chat");
+        Render(window, output, "chat-typing", 1180, 760);
+        Check(Descendants<Border>(window).Any(b => AutomationProperties.GetName(b) == "Jordan is typing"), "A friend typing shows a typing bubble");
+        Set(vm, "Chat", history); Notify(vm, "Chat");
         Check(Descendants<TextBlock>(window).Count(t => t.Text.EndsWith("Sending…")) == 1 && !Descendants<TextBlock>(window).Any(t => t.Text.Contains("Delivered")), "Delivery shown only while pending");
         Check(Descendants<TextBlock>(window).Count(t => t.Text == "Jordan") == 2, "Friend name once per turn");
         Check(!Contains(window, "Join a room to chat") && !Contains(window, "Room only"), "No redundant chat captions");
         ClickNamed(window, "RoomNav");
+        typeof(MainWindow).GetMethod("ShowChatBanner", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [new ChatMessage(8, "Jordan", "lobby is up on my side", false, now, "Received")]);
+        var banner = (Border)window.FindName("ChatBanner");
+        Check(banner.Visibility == Visibility.Visible && Contains(window, "lobby is up on my side"), "A message while the app is open shows an in-app notification");
+        Render(window, output, "chat-banner", 1180, 720);
+        typeof(MainWindow).GetMethod("ClearUnreadChat", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null);
+        Check(banner.Visibility == Visibility.Collapsed, "Reading chat clears the notification");
         var diagram = (NetworkDiagram)window.FindName("Diagram");
         Check(!diagram.State.LanReady && diagram.GlowLayerCount == 0, "PC tunnel alone cannot illuminate console readiness");
         Render(window, output, "ready-local", 1180, 720, new(true, false, false, true));
@@ -175,8 +186,11 @@ internal static class Program
         Render(window, output, "showcase-ethernet-ready", 1180, 720, allReady, showcase: true);
         Set(vm, "WifiNetwork", new IpcWifiNetwork("CODCONNECT-7F2A", "k7mq4xp2", "2.4 GHz")); Notify(vm, "WifiNetwork");
         Set(vm, "ConsoleInternet", "Ready"); Notify(vm, "ConsoleInternet");
-        Render(window, output, "showcase-wifi-ready", 1180, 720, allReady, showcase: true);
+        Render(window, output, "showcase-wifi-ready", 1180, 720, allReady with { Internet = "Ready" }, showcase: true);
         Check(Contains(window, "Through this PC"), "Console Internet shows when Windows carries the console");
+        Check(diagram.GlowLayerCount == 4, "A console online through this PC lights the Internet link");
+        Render(window, output, "internet-setting-up", 1180, 720, new NetworkVisualState(true, false, true, true, true, Internet: "Starting"));
+        Render(window, output, "relay-two-player", 1180, 720, allReady with { Relayed = true, Internet = "Ready" }, showcase: true);
 
         List<IpcPlayer> squad =
         [
@@ -191,7 +205,8 @@ internal static class Program
             var players = squad.Take(count).ToList();
             Set(vm, "Players", players); Notify(vm, "Players");
             var visual = new NetworkVisualState(true, players.All(p => p.ConsoleReady), true, true, true,
-                players.Select(p => new FriendVisual(p.Name, p.Connected, p.ConsoleReady, RoomBadge.PlayerDetail(p))).ToArray());
+                players.Select(p => new FriendVisual(p.Name, p.Connected, p.ConsoleReady, RoomBadge.PlayerDetail(p), p.Relay)).ToArray(),
+                LocalDetail: "PS5", Internet: "Ready");
             Render(window, output, $"players-{count + 1}", 1180, 720, visual, showcase: true);
             Render(window, output, $"players-{count + 1}-small", 900, 620, visual, showcase: true);
             Check(count == 1 ? Contains(window, "Kyle") && Contains(window, "PS5") : Contains(window, "Friends"), $"{count + 1} players: friend row");
@@ -204,6 +219,14 @@ internal static class Program
         Check(RoomBadge.Describe(Screen.Connected, [new("Kyle", true, "PS5", true, false)]) == "Kyle joined", "One friend by name");
         Check(RoomBadge.Describe(Screen.Hosting, [new("Kyle", false, null, false, false)]) == "Connecting to Kyle", "Friend on the way");
         Check(RoomBadge.Change(["Kyle"], ["Kyle", "Ana"]) == "Ana joined" && RoomBadge.Change(["Kyle", "Ana"], ["Kyle"]) == "Ana left", "Arrivals and departures");
+        List<IpcPlayer> dropped = [new("Kyle", false, "PS5", false, false), .. squad.Skip(1).Take(4)];
+        Check(RoomBadge.Describe(Screen.Connected, dropped, null, ["Kyle"]) == "Reconnecting Kyle…" && RoomBadge.PlayerDetail(dropped[0], true) == "Reconnecting", "A friend whose link drops shows as reconnecting");
+        Check(RoomBadge.Connection("Direct", true, squad) == "Direct, 1 via relay" && RoomBadge.Connection("Relay", true, squad) == "Relay" && RoomBadge.Connection(null, false, []) == "Pending", "Connection row counts friends on the relay");
+        Set(vm, "Players", dropped); Set(vm, "ReconnectingPlayers", new HashSet<string> { "Kyle" }); Notify(vm, "Players");
+        Render(window, output, "players-reconnecting", 1180, 720, new NetworkVisualState(true, false, true, true, true,
+            dropped.Select(p => new FriendVisual(p.Name, p.Connected, p.ConsoleReady, RoomBadge.PlayerDetail(p, p.Name == "Kyle"), p.Relay, p.Name == "Kyle")).ToArray(), LocalDetail: "PS5", Internet: "Ready"), showcase: true);
+        Check(Contains(window, "Reconnecting Kyle…"), "Badge names the friend who is reconnecting");
+        Set(vm, "ReconnectingPlayers", new HashSet<string>());
         Set(vm, "Players", new List<IpcPlayer>()); Notify(vm, "Players");
         Render(window, output, "wifi-ready-small", 900, 620, allReady);
         Check(Contains(window, "CODCONNECT-7F2A") && Contains(window, "On your console, join"), "Wi-Fi room shows the network to join");
@@ -235,6 +258,13 @@ internal static class Program
         Check(Descendants<Button>(window).Single(b => Equals(b.Content, "Leave room")).IsEnabled == false, "Busy action guarded");
         Set(vm, "IsBusy", false); Set(vm, "Screen", Screen.Home); ClickNamed(window, "RoomNav");
         Render(window, output, "home-small", 900, 620);
+        Set(vm, "IsBusy", true); Notify(vm, "IsBusy");
+        var submit = Descendants<Button>(window).Single(b => AutomationProperties.GetAutomationId(b) == "RoomSubmit");
+        Check(submit.Content is StackPanel && !submit.IsHitTestVisible && submit.IsEnabled, "Creating a room shows a spinner on the button and ignores clicks");
+        Render(window, output, "home-busy", 1180, 720);
+        Set(vm, "IsBusy", false); Notify(vm, "IsBusy");
+        submit = Descendants<Button>(window).Single(b => AutomationProperties.GetAutomationId(b) == "RoomSubmit");
+        Check(submit.Content is string && submit.IsHitTestVisible, "The button returns to normal when the room is ready");
         window.NpcapMissing = true; window.SoftEtherClientMissing = true; typeof(MainWindow).GetMethod("RefreshScreen", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null);
         Render(window, output, "home-npcap-missing-small", 900, 620);
         Check(Contains(window, "CODCONNECT needs Npcap to reach your console. Install it, then come back."), "Missing Npcap is explained with a way to get it");
@@ -285,7 +315,9 @@ internal static class Program
                 if (text.Length != 2) continue;
                 if (text[0].Text == "Your console") text[1].Text = state.LocalReady ? "PlayStation" : "Not identified";
                 if (text[0].Text == "Friend’s console") text[1].Text = state.RemoteReady ? "PlayStation" : "Not identified";
-                if (text[0].Text == "Connection") text[1].Text = state.TunnelConnected ? "Direct" : "Pending";
+                if (text[0].Text == "Connection") text[1].Text = !state.TunnelConnected ? "Pending"
+                    : state.Friends?.Count(f => f.Relay && f.Attached && !f.Lost) is > 0 and var relayed ? $"Direct, {relayed} via relay"
+                    : state.Relayed ? "Relay" : "Direct";
                 if (text[0].Text == "Friend’s PC") text[1].Text = state.RemoteAttached ? "Connected" : "Waiting";
             }
             window.UpdateLayout();
